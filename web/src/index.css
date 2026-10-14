@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+  --color-brand-300: oklch(0.88 0.13 85);
+  --color-brand-400: oklch(0.83 0.16 80);
+  --color-brand-500: oklch(0.77 0.17 70);
+  --color-brand-600: oklch(0.68 0.16 62);
+
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
+  @keyframes indeterminate {
+    from { left: -35%; }
+    to { left: 100%; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-brand-500/30;
+  }
+}
+
+/* Thin scrollbars for the console and tables. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-zinc-700) transparent;
+}

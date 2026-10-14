@@ -1,0 +1,6 @@
+/data/
+/bin/
+*.exe
+# Local Hytale server files (proprietary, downloaded at runtime)
+/server/
+.idea/

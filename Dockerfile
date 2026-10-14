@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+
+# ---- Build the React interface ----
+FROM node:22-alpine AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+RUN npm run build
+
+# ---- Build: static Go binary with the web interface embedded ----
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+COPY web/embed.go ./web/
+COPY --from=web /web/dist ./web/dist
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags="-s -w" -o /out/hytale-manager ./cmd/manager
+
+# ---- Bind hook: LD_PRELOAD library used by the sleep mode ----
+# Same base as the runtime so that it links against the same glibc.
+FROM debian:trixie-slim AS bindhook
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+COPY native/bindhook/bindhook.c /src/
+RUN mkdir /out \
+ && gcc -O2 -Wall -Wextra -Werror -shared -fPIC -pthread -o /out/hsm-bindhook.so /src/bindhook.c -ldl
+
+# ---- Runtime: Java and the game are downloaded automatically at runtime ----
+# glibc base: the server's native QUIC libraries are not built for musl.
+FROM debian:trixie-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 1000 hytale \
+ && useradd --system --uid 1000 --gid hytale --home-dir /data --no-create-home --shell /usr/sbin/nologin hytale \
+ && mkdir /data && chown hytale:hytale /data && chmod 750 /data
+
+COPY --from=build /out/hytale-manager /usr/local/bin/hytale-manager
+COPY --from=bindhook /out/hsm-bindhook.so /usr/local/lib/hsm-bindhook.so
+
+ENV HSM_DATA_DIR=/data \
+    HSM_LISTEN_ADDR=:8080 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+USER hytale
+WORKDIR /data
+VOLUME ["/data"]
+EXPOSE 8080/tcp 5520/udp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["hytale-manager", "healthcheck"]
+
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/bin/tini", "--", "hytale-manager"]

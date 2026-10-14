@@ -1,0 +1,32 @@
+services:
+  hytale:
+    build: .
+    image: hytale-server-manager:latest
+    container_name: hytale
+    restart: unless-stopped
+    ports:
+      # Management interface. Prefer "127.0.0.1:8080:8080" behind an HTTPS
+      # reverse proxy (then set HSM_SECURE_COOKIES=true).
+      - "8080:8080/tcp"
+      # Game port: Hytale uses QUIC over UDP only.
+      - "5520:5520/udp"
+    volumes:
+      - hytale-data:/data
+    environment:
+      HSM_SECURE_COOKIES: "false"
+      HSM_TRUST_PROXY: "false"
+      HSM_MAX_UPLOAD_MB: "1024"
+      # HSM_RESET_PASSWORD: "true"   # regenerate the panel password once
+    # Leave the game server time to save the world on "docker stop".
+    stop_grace_period: 90s
+    # Hardening: the image only writes to /data and /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  hytale-data:
