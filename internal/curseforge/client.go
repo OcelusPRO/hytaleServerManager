@@ -28,8 +28,8 @@ const (
 
 // Errors returned by the client.
 var (
-	ErrNoAPIKey      = errors.New("aucune clé API CurseForge n'est configurée (Paramètres)")
-	ErrInvalidAPIKey = errors.New("clé API CurseForge refusée")
+	ErrNoAPIKey      = errors.New("no CurseForge API key is configured (Settings)")
+	ErrInvalidAPIKey = errors.New("CurseForge API key rejected")
 )
 
 // APIError is a non-successful CurseForge response.
@@ -37,7 +37,7 @@ type APIError struct {
 	Status int
 }
 
-func (e *APIError) Error() string { return fmt.Sprintf("CurseForge a répondu HTTP %d", e.Status) }
+func (e *APIError) Error() string { return fmt.Sprintf("CurseForge answered HTTP %d", e.Status) }
 
 // Release types of a file.
 const (
@@ -226,11 +226,11 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 	var env envelope[json.RawMessage]
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(&env); err != nil {
-		return nil, fmt.Errorf("réponse CurseForge illisible : %w", err)
+		return nil, fmt.Errorf("unreadable CurseForge response: %w", err)
 	}
 	if out != nil {
 		if err := json.Unmarshal(env.Data, out); err != nil {
-			return nil, fmt.Errorf("réponse CurseForge inattendue : %w", err)
+			return nil, fmt.Errorf("unexpected CurseForge response: %w", err)
 		}
 	}
 	return env.Pagination, nil
@@ -355,7 +355,7 @@ func (c *Client) DownloadURL(ctx context.Context, modID, fileID int) (string, er
 func (c *Client) Download(ctx context.Context, fileURL string, dst io.Writer, maxBytes int64) (int64, error) {
 	u, err := url.Parse(fileURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return 0, errors.New("URL de téléchargement CurseForge invalide")
+		return 0, errors.New("invalid CurseForge download URL")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
 	if err != nil {
@@ -363,7 +363,7 @@ func (c *Client) Download(ctx context.Context, fileURL string, dst io.Writer, ma
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("téléchargement impossible : %w", errors.Unwrap(err))
+		return 0, fmt.Errorf("download failed: %w", errors.Unwrap(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -374,7 +374,7 @@ func (c *Client) Download(ctx context.Context, fileURL string, dst io.Writer, ma
 		return n, err
 	}
 	if n > maxBytes {
-		return n, errors.New("le fichier dépasse la taille autorisée")
+		return n, errors.New("the file exceeds the allowed size")
 	}
 	return n, nil
 }

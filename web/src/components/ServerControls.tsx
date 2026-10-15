@@ -3,6 +3,7 @@ import { useStatus } from "../hooks/useStatus";
 import { api } from "../lib/api";
 import { Button } from "./ui/Button";
 import { useFeedback } from "./ui/feedback";
+import { translate as t } from "../lib/i18n";
 
 /** Start / stop / restart / kill buttons reflecting the server state. */
 export function ServerControls() {
@@ -23,42 +24,42 @@ export function ServerControls() {
 
   const kill = async () => {
     const ok = await confirm({
-      title: "Forcer l'arrêt du serveur ?",
-      message: "Le processus est tué immédiatement, sans sauvegarde du monde.",
-      confirmLabel: "Forcer l'arrêt",
+      title: t("shell.controls.killTitle"),
+      message: t("shell.controls.killMessage"),
+      confirmLabel: t("shell.controls.kill"),
       danger: true,
     });
-    if (ok) await call("/api/server/kill", "Serveur arrêté de force")();
+    if (ok) await call("/api/server/kill", t("shell.controls.killed"))();
   };
 
   if (server.state === "sleeping") {
     return (
       <>
-        <Button icon={Square} onClick={call("/api/server/stop", "Veille annulée, serveur arrêté")} title="Arrête la veille : le serveur ne redémarrera plus tout seul">
-          Arrêter
+        <Button icon={Square} onClick={call("/api/server/stop", t("shell.controls.sleepCancelled"))} title={t("shell.controls.cancelSleepHint")}>
+          {t("shell.controls.cancelSleep")}
         </Button>
-        <Button variant="primary" icon={Play} disabled={!canStart} onClick={call("/api/server/start", "Réveil du serveur")}>
-          Réveiller
+        <Button variant="primary" icon={Play} disabled={!canStart} onClick={call("/api/server/start", t("shell.controls.waking"))}>
+          {t("shell.controls.wake")}
         </Button>
       </>
     );
   }
   if (!active) {
     return (
-      <Button variant="primary" icon={Play} disabled={!canStart} onClick={call("/api/server/start", "Démarrage du serveur")}>
-        Démarrer
+      <Button variant="primary" icon={Play} disabled={!canStart} onClick={call("/api/server/start", t("shell.controls.starting"))}>
+        {t("shell.controls.start")}
       </Button>
     );
   }
   return (
     <>
-      <Button icon={RotateCw} disabled={!running} onClick={call("/api/server/restart", "Serveur redémarré")}>
-        Redémarrer
+      <Button icon={RotateCw} disabled={!running} onClick={call("/api/server/restart", t("shell.controls.restarted"))}>
+        {t("shell.controls.restart")}
       </Button>
-      <Button icon={Square} disabled={!running} onClick={call("/api/server/stop", "Serveur arrêté")}>
-        Arrêter
+      <Button icon={Square} disabled={!running} onClick={call("/api/server/stop", t("shell.controls.stopped"))}>
+        {t("shell.controls.stop")}
       </Button>
-      <Button variant="danger" icon={Skull} onClick={kill} aria-label="Forcer l'arrêt" title="Forcer l'arrêt" />
+      <Button variant="danger" icon={Skull} onClick={kill} aria-label={t("shell.controls.kill")} title={t("shell.controls.kill")} />
     </>
   );
 }

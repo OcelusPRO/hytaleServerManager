@@ -55,6 +55,9 @@ type Settings struct {
 	// it again as soon as a player tries to connect.
 	SleepEnabled     bool `json:"sleepEnabled"`
 	SleepIdleMinutes int  `json:"sleepIdleMinutes"`
+	// GameLanguage is the language of the announcements shown to players
+	// in game (automatic updates).
+	GameLanguage string `json:"gameLanguage"`
 	// GameVersionPin freezes the game on one build ("" = follow the latest).
 	// It is changed through /api/setup/version, which also applies it.
 	GameVersionPin string `json:"gameVersionPin"`
@@ -85,6 +88,7 @@ func Defaults() Settings {
 
 		SleepEnabled:     false,
 		SleepIdleMinutes: 10,
+		GameLanguage:     "en",
 	}
 }
 
@@ -96,20 +100,21 @@ func (s Settings) Validate() error {
 			errs = append(errs, fmt.Errorf(format, args...))
 		}
 	}
-	check(s.MinMemoryMB >= 256 && s.MinMemoryMB <= 262144, "mémoire minimale invalide")
-	check(s.MaxMemoryMB >= 1024 && s.MaxMemoryMB <= 262144, "mémoire maximale invalide (minimum 1024 Mo)")
-	check(s.MinMemoryMB <= s.MaxMemoryMB, "la mémoire minimale dépasse la maximale")
-	check(s.Port >= 1 && s.Port <= 65535, "port invalide")
-	check(s.Patchline == PatchlineRelease || s.Patchline == PatchlinePreRelease, "patchline invalide")
-	check(s.AuthMode == AuthModeAuthenticated || s.AuthMode == AuthModeOffline, "mode d'authentification invalide")
-	check(s.NativeBackupMinutes >= 5 && s.NativeBackupMinutes <= 1440, "fréquence de sauvegarde invalide (5-1440 min)")
-	check(s.StopTimeoutSeconds >= 10 && s.StopTimeoutSeconds <= 600, "délai d'arrêt invalide (10-600 s)")
-	check(s.AutosaveMinutes >= 1 && s.AutosaveMinutes <= 1440, "fréquence d'autosave invalide (1-1440 min)")
-	check(s.AutosaveSlots >= 1 && s.AutosaveSlots <= 100, "nombre de slots d'autosave invalide (1-100)")
-	check(s.AutoUpdateIdleMinutes >= 1 && s.AutoUpdateIdleMinutes <= 1440, "délai d'inactivité de mise à jour invalide (1-1440 min)")
-	check(s.AutoUpdateForceHours >= 1 && s.AutoUpdateForceHours <= 720, "délai de mise à jour forcée invalide (1-720 h)")
-	check(s.SleepIdleMinutes >= 1 && s.SleepIdleMinutes <= 1440, "délai de mise en veille invalide (1-1440 min)")
-	check(s.GameVersionPin == "" || versionPattern.MatchString(s.GameVersionPin), "version du jeu invalide")
+	check(s.MinMemoryMB >= 256 && s.MinMemoryMB <= 262144, "invalid minimum memory")
+	check(s.MaxMemoryMB >= 1024 && s.MaxMemoryMB <= 262144, "invalid maximum memory (at least 1024 MB)")
+	check(s.MinMemoryMB <= s.MaxMemoryMB, "the minimum memory exceeds the maximum")
+	check(s.Port >= 1 && s.Port <= 65535, "invalid port")
+	check(s.Patchline == PatchlineRelease || s.Patchline == PatchlinePreRelease, "invalid patchline")
+	check(s.AuthMode == AuthModeAuthenticated || s.AuthMode == AuthModeOffline, "invalid authentication mode")
+	check(s.NativeBackupMinutes >= 5 && s.NativeBackupMinutes <= 1440, "invalid backup frequency (5-1440 min)")
+	check(s.StopTimeoutSeconds >= 10 && s.StopTimeoutSeconds <= 600, "invalid stop timeout (10-600 s)")
+	check(s.AutosaveMinutes >= 1 && s.AutosaveMinutes <= 1440, "invalid autosave frequency (1-1440 min)")
+	check(s.AutosaveSlots >= 1 && s.AutosaveSlots <= 100, "invalid number of autosave slots (1-100)")
+	check(s.AutoUpdateIdleMinutes >= 1 && s.AutoUpdateIdleMinutes <= 1440, "invalid update idle delay (1-1440 min)")
+	check(s.AutoUpdateForceHours >= 1 && s.AutoUpdateForceHours <= 720, "invalid forced update delay (1-720 h)")
+	check(s.SleepIdleMinutes >= 1 && s.SleepIdleMinutes <= 1440, "invalid sleep delay (1-1440 min)")
+	check(s.GameLanguage == "en" || s.GameLanguage == "fr", "invalid game language")
+	check(s.GameVersionPin == "" || versionPattern.MatchString(s.GameVersionPin), "invalid game version")
 	return errors.Join(errs...)
 }
 

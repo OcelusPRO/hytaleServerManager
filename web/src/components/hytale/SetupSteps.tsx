@@ -4,6 +4,7 @@ import { cn } from "../../lib/cn";
 import { formatPercent } from "../../lib/format";
 import type { HytaleAuthStatus, SetupStatus } from "../../lib/types";
 import { Progress } from "../ui/Progress";
+import { translate as t } from "../../lib/i18n";
 
 type StepState = "done" | "active" | "waiting";
 
@@ -51,29 +52,29 @@ export function SetupSteps({ setup, hytale }: { setup: SetupStatus; hytale: Hyta
 
   const gameDetail =
     setup.activity === "extracting"
-      ? "Installation des fichiers…"
+      ? t("hytale.steps.extracting")
       : setup.activity === "downloading"
-        ? "Téléchargement depuis les serveurs Hytale"
+        ? t("hytale.steps.downloading")
         : setup.gameReady
-          ? `Version ${setup.gameVersion ?? "installée"}`
-          : "Démarre automatiquement après la connexion";
+          ? t("hytale.steps.version", { version: setup.gameVersion ?? t("hytale.steps.installedVersion") })
+          : t("hytale.steps.startsAfterLogin");
 
   return (
     <ol className="flex flex-col gap-4">
       <Step
         state={setup.javaReady ? "done" : "active"}
-        title="Environnement Java 25"
-        detail={setup.javaReady ? (setup.javaVersion ?? "Installé") : "Téléchargement en cours"}
+        title={t("hytale.steps.java")}
+        detail={setup.javaReady ? (setup.javaVersion ?? t("hytale.steps.installed")) : t("hytale.steps.downloadingJava")}
         progress={javaActive ? setup.progress : undefined}
       />
       <Step
         state={accountReady ? "done" : hytale.login.state === "pending" ? "active" : "waiting"}
-        title="Compte Hytale"
-        detail={accountReady ? `Connecté en tant que ${hytale.profileName ?? "—"}` : "En attente de connexion"}
+        title={t("hytale.steps.account")}
+        detail={accountReady ? t("hytale.steps.connectedAs", { name: hytale.profileName ?? "—" }) : t("hytale.steps.waitingLogin")}
       />
       <Step
         state={setup.gameReady && !gameActive ? "done" : gameActive ? "active" : "waiting"}
-        title="Fichiers du serveur"
+        title={t("hytale.steps.files")}
         detail={gameDetail}
         progress={gameActive ? setup.progress : undefined}
       />

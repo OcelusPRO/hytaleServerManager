@@ -4,6 +4,7 @@ import { applySuggestion, complete, type CommandEntry, type Suggestion } from ".
 import { Button } from "../ui/Button";
 import { CompletionPanel } from "./CompletionPanel";
 import { useCommandHistory } from "./useCommandHistory";
+import { translate as t } from "../../lib/i18n";
 
 interface CommandInputProps {
   entries: CommandEntry[];
@@ -113,7 +114,7 @@ export function CommandInput({ entries, onlinePlayers, disabled, onSubmit }: Com
           onKeyDown={onKeyDown}
           onBlur={() => setOpen(false)}
           onFocus={() => setOpen(true)}
-          placeholder={disabled ? "Le serveur est arrêté" : "Tapez / pour voir les commandes"}
+          placeholder={disabled ? t("console.input.stopped") : t("console.input.placeholder")}
           disabled={disabled}
           maxLength={1024}
           autoComplete="off"
@@ -124,14 +125,14 @@ export function CommandInput({ entries, onlinePlayers, disabled, onSubmit }: Com
           className="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
         />
         <span className="hidden items-center gap-1 text-[11px] text-zinc-500 sm:flex">
-          <kbd className="rounded bg-zinc-800 px-1.5 py-0.5">Tab</kbd> compléter
+          <kbd className="rounded bg-zinc-800 px-1.5 py-0.5">Tab</kbd> {t("console.input.complete")}
           <kbd className="ml-2 inline-flex items-center rounded bg-zinc-800 px-1.5 py-0.5">
             <CornerDownLeft className="size-3" />
           </kbd>
-          envoyer
+          {t("console.input.send")}
         </span>
         <Button type="submit" variant="primary" icon={SendHorizontal} disabled={disabled || !value.trim()}>
-          Envoyer
+          {t("console.input.sendButton")}
         </Button>
       </div>
     </form>

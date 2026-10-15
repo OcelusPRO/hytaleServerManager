@@ -4,6 +4,7 @@ import { SetupSteps } from "../components/hytale/SetupSteps";
 import { Logo } from "../components/layout/Logo";
 import { Card } from "../components/ui/Card";
 import type { HytaleAuthStatus, SetupStatus } from "../lib/types";
+import { translate as t } from "../lib/i18n";
 
 interface OnboardingPageProps {
   setup: SetupStatus;
@@ -24,12 +25,12 @@ export function OnboardingPage({ setup, hytale }: OnboardingPageProps) {
         <Card>
           <div className="px-6 pt-8 pb-6 text-center">
             <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-              {needsProfile ? "Choisissez un profil" : "Connectez votre compte Hytale"}
+              {needsProfile ? t("pages.onboarding.chooseProfile") : t("pages.onboarding.connect")}
             </h1>
             <p className="mx-auto mt-2 max-w-xs text-sm text-zinc-400">
               {needsProfile
-                ? "Votre compte possède plusieurs profils : sélectionnez celui qui hébergera le serveur."
-                : "C'est la seule étape : le serveur se télécharge et se configure ensuite automatiquement."}
+                ? t("pages.onboarding.chooseProfileHint")
+                : t("pages.onboarding.connectHint")}
             </p>
             <div className="mt-6 flex justify-center">{needsProfile ? <ProfilePicker /> : <HytaleConnect />}</div>
           </div>
@@ -38,7 +39,7 @@ export function OnboardingPage({ setup, hytale }: OnboardingPageProps) {
           </div>
         </Card>
         <p className="mt-6 text-center text-xs text-zinc-500">
-          La connexion se fait sur le site officiel de Hytale, aucun mot de passe ne transite par ce panneau.
+          {t("pages.onboarding.footer")}
         </p>
       </div>
     </main>

@@ -30,7 +30,7 @@ func ValidVersion(v string) bool { return versionPattern.MatchString(v) }
 var versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$`)
 
 // ErrVersionNotStored is returned when a rollback target is not available locally.
-var ErrVersionNotStored = errors.New("cette version n'est pas stockée localement")
+var ErrVersionNotStored = errors.New("this version is not stored locally")
 
 // GameFiles points at the files needed to launch the server.
 type GameFiles struct {
@@ -248,7 +248,7 @@ func findGameRoot(dir string) (string, error) {
 		return "", err
 	}
 	if root == "" {
-		return "", errors.New("archive du jeu inattendue : Assets.zip ou Server/HytaleServer.jar manquant")
+		return "", errors.New("unexpected game archive: Assets.zip or Server/HytaleServer.jar missing")
 	}
 	return root, nil
 }

@@ -3,6 +3,7 @@ package players
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"os"
@@ -59,7 +60,7 @@ func OpenRegistry(path string) (*Registry, error) {
 		return nil, err
 	}
 	if err := json.Unmarshal(data, &r.players); err != nil {
-		return nil, errors.New(filepath.Base(path) + " est illisible")
+		return nil, fmt.Errorf("%s is unreadable", filepath.Base(path))
 	}
 	if r.players == nil {
 		r.players = make(map[string]RegisteredPlayer)

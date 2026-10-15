@@ -7,10 +7,10 @@ import (
 
 // Service errors.
 var (
-	ErrServerStopped = errors.New("le serveur doit être démarré pour cette action")
-	ErrNoActiveSave  = errors.New("aucun monde actif")
-	ErrInvalidUUID   = errors.New("identifiant de joueur invalide")
-	ErrUnknownList   = errors.New("liste inconnue")
+	ErrServerStopped = errors.New("the server must be running for this action")
+	ErrNoActiveSave  = errors.New("no active world")
+	ErrInvalidUUID   = errors.New("invalid player identifier")
+	ErrUnknownList   = errors.New("unknown list")
 )
 
 // List identifies an access list a player can be removed from.

@@ -19,11 +19,11 @@ import (
 
 // Errors explaining why the server cannot start.
 var (
-	ErrInstallRunning     = errors.New("le serveur est en cours de mise à jour, patientez")
-	ErrJavaMissing        = errors.New("Java est en cours de téléchargement, patientez")
-	ErrGameMissing        = errors.New("les fichiers du serveur ne sont pas encore téléchargés : connectez votre compte Hytale")
-	ErrNoActiveSave       = errors.New("aucun monde actif : créez-en ou sélectionnez-en un")
-	ErrHytaleAuthRequired = errors.New("connectez votre compte Hytale ou passez en mode offline")
+	ErrInstallRunning     = errors.New("the server is being updated, please wait")
+	ErrJavaMissing        = errors.New("Java is being downloaded, please wait")
+	ErrGameMissing        = errors.New("the server files are not downloaded yet: connect your Hytale account")
+	ErrNoActiveSave       = errors.New("no active world: create or select one")
+	ErrHytaleAuthRequired = errors.New("connect your Hytale account or switch to offline mode")
 )
 
 const (
@@ -205,7 +205,7 @@ func (c *Controller) startLocked(ctx context.Context) error {
 		Tokens:    tokens,
 		ExtraEnv:  extraEnv,
 	})
-	c.console.System(fmt.Sprintf("Démarrage du serveur (sauvegarde %s, mode %s)…", st.ActiveSaveID, st.AuthMode))
+	c.console.System(fmt.Sprintf("Starting the server (save %s, mode %s)…", st.ActiveSaveID, st.AuthMode))
 	if c.beforeStart != nil {
 		c.beforeStart()
 	}
@@ -235,7 +235,7 @@ func (c *Controller) gameSession(ctx context.Context, st settings.Settings) (*ga
 	defer cancel()
 	grant, err := c.auth.NewGameSession(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("session de jeu Hytale: %w", err)
+		return nil, fmt.Errorf("Hytale game session: %w", err)
 	}
 	c.session.set(grant.SessionToken)
 	return &gameserver.SessionTokens{
@@ -263,14 +263,14 @@ func (c *Controller) handleExit(info gameserver.ExitInfo) {
 		return
 	}
 	if !c.restarts.take() {
-		c.console.System("Trop de plantages récents : redémarrage automatique désactivé.")
+		c.console.System("Too many recent crashes: automatic restart disabled.")
 		return
 	}
-	c.console.System(fmt.Sprintf("Plantage détecté, redémarrage dans %s…", crashRestartDelay))
+	c.console.System(fmt.Sprintf("Crash detected, restarting in %s…", crashRestartDelay))
 	go func() {
 		time.Sleep(crashRestartDelay)
 		if err := c.Start(context.Background()); err != nil && !errors.Is(err, gameserver.ErrAlreadyRunning) {
-			c.console.System("Redémarrage automatique impossible : " + err.Error())
+			c.console.System("Automatic restart failed: " + err.Error())
 		}
 	}()
 }

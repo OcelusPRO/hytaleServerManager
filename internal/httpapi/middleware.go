@@ -53,7 +53,7 @@ func csrfGuard(next http.Handler) http.Handler {
 			return
 		}
 		if r.Header.Get(csrfHeader) != csrfValue || !sameOrigin(r) {
-			writeMessage(w, http.StatusForbidden, "requête refusée (CSRF)")
+			writeMessage(w, http.StatusForbidden, "request rejected (CSRF)")
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -13,10 +13,10 @@ import (
 
 // Errors returned by the Service.
 var (
-	ErrNotAuthenticated = errors.New("aucun compte Hytale n'est connecté")
-	ErrNoProfile        = errors.New("aucun profil Hytale sélectionné")
+	ErrNotAuthenticated = errors.New("no Hytale account is connected")
+	ErrNoProfile        = errors.New("no Hytale profile selected")
 	ErrUnknownProfile   = errors.New("profil Hytale inconnu")
-	ErrReauthRequired   = errors.New("la session Hytale a expiré, reconnectez le compte")
+	ErrReauthRequired   = errors.New("the Hytale session expired, reconnect the account")
 )
 
 const (

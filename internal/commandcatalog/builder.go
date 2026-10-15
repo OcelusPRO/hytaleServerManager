@@ -85,7 +85,7 @@ func (b *Builder) run(ctx context.Context, c *collector, command string) ([]stri
 		case <-timer.C:
 			c.reset() // stop capturing whatever comes late
 			if lines == nil && command == "commands dump" {
-				return nil, errors.New("le serveur n'a pas répondu à /commands dump")
+				return nil, errors.New("the server did not answer /commands dump")
 			}
 			return lines, nil
 		}

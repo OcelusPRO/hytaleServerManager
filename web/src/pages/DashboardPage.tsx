@@ -1,6 +1,8 @@
 import { ArrowRight, Clock, Globe, Package, Users, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { HostWarnings } from "../components/HostWarnings";
 import { HytaleConnect } from "../components/hytale/HytaleConnect";
+import { ResourceCharts } from "../components/metrics/ResourceCharts";
 import { PageHeader } from "../components/layout/PageHeader";
 import { ServerControls } from "../components/ServerControls";
 import { Alert } from "../components/ui/Alert";
@@ -18,6 +20,7 @@ import { formatDuration, formatTime } from "../lib/format";
 import { serverStates } from "../lib/serverState";
 import type { SavesResponse, ServerSettings } from "../lib/types";
 import { paths } from "../routes";
+import { translate as t, translatePlural as tp, translateServer } from "../lib/i18n";
 
 function Stat({ icon: Icon, label, value, hint }: { icon: LucideIcon; label: string; value: ReactNode; hint?: ReactNode }) {
   return (
@@ -47,24 +50,24 @@ function RecentConsole() {
   return (
     <Card className="flex flex-col lg:col-span-2">
       <CardHeader
-        title="Activité récente"
+        title={t("pages.dashboard.recentActivity")}
         actions={
           <Link
             to={paths.console}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
           >
-            Ouvrir la console <ArrowRight className="size-3.5" />
+            {t("pages.dashboard.openConsole")} <ArrowRight className="size-3.5" />
           </Link>
         }
       />
       <div className="m-5 mt-4 h-72 overflow-hidden rounded-lg bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed ring-1 ring-white/[0.06]">
         {recent.length === 0 ? (
-          <p className="text-zinc-600">Aucune activité pour le moment.</p>
+          <p className="text-zinc-600">{t("pages.dashboard.noActivity")}</p>
         ) : (
           recent.map((l) => (
             <p key={l.seq} className={cn("truncate", l.stream === "err" ? "text-red-400" : l.stream === "sys" ? "text-sky-400" : l.stream === "in" ? "text-brand-300" : "text-zinc-300")}>
               <span className="mr-3 text-zinc-600">{formatTime(l.time)}</span>
-              {l.text}
+              {l.stream === "sys" ? translateServer(l.text) : l.text}
             </p>
           ))
         )}
@@ -91,97 +94,100 @@ export function DashboardPage() {
     const ok =
       !running ||
       (await confirm({
-        title: "Mettre à jour le serveur ?",
-        message: "Le serveur va être arrêté, mis à jour puis redémarré automatiquement.",
-        confirmLabel: "Mettre à jour",
+        title: t("pages.dashboard.updateTitle"),
+        message: t("pages.dashboard.updateMessage"),
+        confirmLabel: t("pages.dashboard.update"),
       }));
-    if (ok) await run(() => api.post("/api/setup/update"), "Mise à jour lancée");
+    if (ok) await run(() => api.post("/api/setup/update"), t("pages.dashboard.updateStarted"));
     await refresh();
   };
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Tableau de bord"
-        description="État et contrôle de votre serveur Hytale."
+        title={t("pages.dashboard.title")}
+        description={t("pages.dashboard.description")}
         actions={<ServerControls />}
       />
 
       {accountMissing && (
-        <Alert tone="warning" title="Compte Hytale déconnecté">
-          <p>Reconnectez le compte pour que les joueurs puissent rejoindre le serveur.</p>
+        <Alert tone="warning" title={t("pages.dashboard.accountDisconnected")}>
+          <p>{t("pages.dashboard.accountDisconnectedHint")}</p>
           <div className="mt-3">
-            <HytaleConnect label="Reconnecter le compte" align="start" />
+            <HytaleConnect label={t("pages.dashboard.reconnect")} align="start" />
           </div>
         </Alert>
       )}
       {setup.updateAvailable && (
         <Alert
           tone="info"
-          title={`Mise à jour disponible : ${setup.latestVersion}`}
+          title={t("pages.dashboard.updateAvailable", { version: setup.latestVersion ?? "" })}
           action={
             <Button size="sm" variant="primary" onClick={update}>
-              Mettre à jour
+              {t("pages.dashboard.update")}
             </Button>
           }
         >
-          {running ? "Elle sera appliquée au prochain arrêt du serveur, ou maintenant." : "Elle va être installée automatiquement."}
+          {running ? t("pages.dashboard.updateWhenRunning") : t("pages.dashboard.updateWhenStopped")}
         </Alert>
       )}
       {setup.error && (
-        <Alert tone="danger" title="Échec de l'installation automatique">
-          {setup.error} — nouvel essai dans une minute.
+        <Alert tone="danger" title={t("pages.dashboard.installFailed")}>
+          {t("pages.dashboard.installRetry", { error: translateServer(setup.error) })}
         </Alert>
       )}
       {server.state === "sleeping" && (
-        <Alert tone="info" title="Serveur en veille">
-          Aucun joueur depuis un moment : le serveur s'est arrêté après avoir sauvegardé le monde. Il redémarre automatiquement dès qu'un joueur tente de se connecter.
+        <Alert tone="info" title={t("pages.dashboard.asleepTitle")}>
+          {t("pages.dashboard.asleepHint")}
         </Alert>
       )}
+      <HostWarnings warnings={server.hostWarnings ?? []} />
       {server.state === "crashed" && (
-        <Alert tone="danger" title="Le serveur s'est arrêté de manière inattendue">
-          Code de sortie {server.exitCode ?? "inconnu"}. Consultez la console pour plus de détails.
+        <Alert tone="danger" title={t("pages.dashboard.crashedTitle")}>
+          {t("pages.dashboard.crashedHint", { code: server.exitCode ?? t("common.unknown") })}
         </Alert>
       )}
       {!server.activeSaveId && (
-        <Alert tone="warning" title="Aucun monde actif" action={<Button size="sm" onClick={() => navigate(paths.worlds)}>Gérer les mondes</Button>}>
-          Créez ou sélectionnez un monde avant de démarrer le serveur.
+        <Alert tone="warning" title={t("pages.dashboard.noWorld")} action={<Button size="sm" onClick={() => navigate(paths.worlds)}>{t("pages.dashboard.manageWorlds")}</Button>}>
+          {t("pages.dashboard.noWorldHint")}
         </Alert>
       )}
       {running && server.saveId !== server.activeSaveId && (
-        <Alert tone="info">Le monde actif a changé : redémarrez le serveur pour l'utiliser.</Alert>
+        <Alert tone="info">{t("pages.dashboard.worldChanged")}</Alert>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           icon={Package}
-          label="Statut"
+          label={t("pages.dashboard.status")}
           value={
             <span className="flex items-center gap-2.5">
               <StatusDot tone={state.tone} pulse={running} className="size-2.5" />
-              {state.label}
+              {t(state.label)}
             </span>
           }
-          hint={running ? `PID ${server.pid}` : "Prêt à démarrer"}
+          hint={running ? t("pages.dashboard.pid", { pid: server.pid ?? "" }) : t("pages.dashboard.readyToStart")}
         />
-        <Stat icon={Users} label="Joueurs connectés" value={running ? server.playerCount : "—"} hint={`Port UDP ${settings?.port ?? "…"}`} />
-        <Stat icon={Clock} label="En ligne depuis" value={running ? formatDuration(server.startedAt) : "—"} />
-        <Stat icon={Globe} label="Monde actif" value={activeSave?.name ?? "Aucun"} hint={activeSave ? `${saves?.saves.length} monde(s) au total` : undefined} />
+        <Stat icon={Users} label={t("pages.dashboard.players")} value={running ? server.playerCount : "—"} hint={t("pages.dashboard.udpPort", { port: settings?.port ?? "…" })} />
+        <Stat icon={Clock} label={t("pages.dashboard.uptime")} value={running ? formatDuration(server.startedAt) : "—"} />
+        <Stat icon={Globe} label={t("pages.dashboard.activeWorld")} value={activeSave?.name ?? t("common.none")} hint={activeSave ? tp("pages.dashboard.worldCount", saves?.saves.length ?? 0) : undefined} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <RecentConsole />
         <Card>
-          <CardHeader title="Informations" />
+          <CardHeader title={t("pages.dashboard.info")} />
           <dl className="divide-y divide-white/[0.05] px-5 pb-2">
-            <InfoRow label="Version du serveur">{setup.gameVersion ?? "—"}</InfoRow>
-            <InfoRow label="Java">{setup.javaVersion ?? "—"}</InfoRow>
-            <InfoRow label="Profil Hytale">{hytale.profileName ?? "—"}</InfoRow>
-            <InfoRow label="Authentification">{settings?.authMode === "offline" ? "Offline" : "Hytale"}</InfoRow>
-            <InfoRow label="Canal">{settings?.patchline ?? "—"}</InfoRow>
+            <InfoRow label={t("pages.dashboard.serverVersion")}>{setup.gameVersion ?? "—"}</InfoRow>
+            <InfoRow label={t("pages.dashboard.java")}>{setup.javaVersion ?? "—"}</InfoRow>
+            <InfoRow label={t("pages.dashboard.profile")}>{hytale.profileName ?? "—"}</InfoRow>
+            <InfoRow label={t("pages.dashboard.authentication")}>{settings?.authMode === "offline" ? t("pages.dashboard.offline") : t("pages.dashboard.hytale")}</InfoRow>
+            <InfoRow label={t("pages.dashboard.channel")}>{settings?.patchline ?? "—"}</InfoRow>
           </dl>
         </Card>
       </div>
+
+      <ResourceCharts maxMemoryMb={settings?.maxMemoryMb} />
     </div>
   );
 }

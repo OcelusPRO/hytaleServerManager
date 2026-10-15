@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"hytale-server-manager/internal/gameserver"
+	"hytale-server-manager/internal/hostcheck"
 	"hytale-server-manager/internal/lifecycle"
 )
 
@@ -27,12 +28,19 @@ func (a *api) routeServer(mux *http.ServeMux) {
 type serverStatusResponse struct {
 	lifecycle.Status
 	PlayerCount int `json:"playerCount"`
+	// HostWarnings are problems reported by the server that only the host's
+	// administrator can fix.
+	HostWarnings []hostcheck.Warning `json:"hostWarnings"`
 }
 
 func (a *api) serverStatus(w http.ResponseWriter, _ *http.Request) {
 	resp := serverStatusResponse{
-		Status:      a.deps.Controller.Status(),
-		PlayerCount: a.deps.Players.Count(),
+		Status:       a.deps.Controller.Status(),
+		PlayerCount:  a.deps.Players.Count(),
+		HostWarnings: []hostcheck.Warning{},
+	}
+	if a.deps.HostWarnings != nil {
+		resp.HostWarnings = a.deps.HostWarnings.Warnings()
 	}
 	if a.sleeping() && !a.deps.Controller.Running() {
 		resp.State = stateSleeping

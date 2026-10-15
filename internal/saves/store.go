@@ -127,7 +127,7 @@ func (s *Store) Import(name, zipPath string, limits archive.Limits) (Save, error
 	}
 	defer os.RemoveAll(staging)
 	if err := archive.ExtractZip(zipPath, staging, limits); err != nil {
-		return Save{}, fmt.Errorf("archive invalide: %w", err)
+		return Save{}, fmt.Errorf("invalid archive: %w", err)
 	}
 	root := findSaveRoot(staging)
 

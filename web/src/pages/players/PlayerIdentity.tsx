@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
 import type { PlayerRef } from "../../lib/types";
+import { translate as t } from "../../lib/i18n";
 
 const palette = [
   "bg-amber-500/15 text-amber-300 ring-amber-500/25",
@@ -17,7 +18,7 @@ function colorFor(uuid: string) {
 }
 
 export function displayName(player: PlayerRef): string {
-  return player.name || "Joueur inconnu";
+  return player.name || t("players.unknownPlayer");
 }
 
 interface PlayerIdentityProps {

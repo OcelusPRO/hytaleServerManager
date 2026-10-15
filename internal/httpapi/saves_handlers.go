@@ -9,7 +9,7 @@ import (
 	"hytale-server-manager/internal/settings"
 )
 
-const errSaveInUse = "cette sauvegarde est utilisée par le serveur en cours d'exécution, arrêtez-le d'abord"
+const errSaveInUse = "this save is used by the running server, stop it first"
 
 // routeSaves registers world save, mod and backup endpoints.
 func (a *api) routeSaves(mux *http.ServeMux) {

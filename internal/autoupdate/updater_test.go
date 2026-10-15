@@ -3,6 +3,7 @@ package autoupdate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func newHarness() *harness {
 	h.pending, h.hasPend = h.now, true
 	h.updater = New(Deps{
 		Config: func() Config {
-			return Config{Enabled: true, IdleAfter: 10 * time.Minute, ForceAfter: 6 * time.Hour}
+			return Config{Enabled: true, IdleAfter: 10 * time.Minute, ForceAfter: 6 * time.Hour, Language: "fr"}
 		},
 		Running:      func() bool { return h.running },
 		PlayerCount:  func() int { return h.players },
@@ -147,5 +148,18 @@ func TestBackupFailureAbortsUpdateAndRestartsServer(t *testing.T) {
 	h.advance(30*time.Minute, time.Second)
 	if len(h.events) != 3 {
 		t.Fatalf("retried too soon: %v", h.events)
+	}
+}
+
+func TestAnnouncementsLanguage(t *testing.T) {
+	en, fr := textsFor("en"), textsFor("fr")
+	if got := fmt.Sprintf(en.updateIn, en.describe(30*time.Second)); got != "Server update in 30 seconds" {
+		t.Errorf("en: %q", got)
+	}
+	if got := fmt.Sprintf(fr.updateIn, fr.describe(5*time.Minute)); got != "Mise à jour du serveur dans 5 minutes" {
+		t.Errorf("fr: %q", got)
+	}
+	if textsFor("xx") != en {
+		t.Error("unknown language should fall back to English")
 	}
 }

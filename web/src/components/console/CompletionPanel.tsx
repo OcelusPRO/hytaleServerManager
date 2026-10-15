@@ -1,6 +1,7 @@
 import { Flag, List, Quote, User, type LucideIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
 import type { ArgumentHint, CommandArg, Suggestion, SuggestionKind } from "../../lib/commandCompletion";
+import { translate as t } from "../../lib/i18n";
 
 const kindIcons: Record<Exclude<SuggestionKind, "command">, { icon: LucideIcon; className: string }> = {
   flag: { icon: Flag, className: "text-violet-400" },
@@ -11,7 +12,7 @@ const kindIcons: Record<Exclude<SuggestionKind, "command">, { icon: LucideIcon; 
 
 /** Display form of an argument inside a syntax line. */
 function argLabel(arg: CommandArg): string {
-  if (arg.flag) return arg.takesValue ? `[${arg.name} <${(arg.type || "valeur").toLowerCase()}>]` : `[${arg.name}]`;
+  if (arg.flag) return arg.takesValue ? `[${arg.name} <${(arg.type || t("console.completion.value")).toLowerCase()}>]` : `[${arg.name}]`;
   return arg.required === false ? `[${arg.name}]` : `<${arg.name}>`;
 }
 
@@ -19,7 +20,7 @@ function Syntax({ command, args, current }: { command: string; args: CommandArg[
   return (
     <li className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 font-mono text-xs">
       <span className="text-brand-400">/{command}</span>
-      {args.length === 0 && <span className="font-sans text-zinc-500">sans argument</span>}
+      {args.length === 0 && <span className="font-sans text-zinc-500">{t("console.completion.noArgument")}</span>}
       {args.map((arg) => (
         <span
           key={arg.name}
@@ -45,8 +46,8 @@ function ArgDetails({ arg, inQuotes }: { arg: CommandArg; inQuotes: boolean }) {
       <p className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-mono text-brand-300">{arg.name}</span>
         {arg.type && <span className="text-zinc-500">{arg.type}</span>}
-        {arg.default && <span className="text-zinc-500">· défaut : {arg.default}</span>}
-        {arg.flag && !arg.takesValue && <span className="text-zinc-500">· option sans valeur</span>}
+        {arg.default && <span className="text-zinc-500">{t("console.completion.defaultValue", { value: arg.default })}</span>}
+        {arg.flag && !arg.takesValue && <span className="text-zinc-500">{t("console.completion.flagOnly")}</span>}
       </p>
       {arg.description && <p className="text-zinc-300">{arg.description}</p>}
       {arg.values && arg.values.length > 0 && (
@@ -61,8 +62,8 @@ function ArgDetails({ arg, inQuotes }: { arg: CommandArg; inQuotes: boolean }) {
       {arg.type?.toLowerCase() === "text" && (
         <p className="text-zinc-500">
           {inQuotes
-            ? "Fermez les guillemets pour terminer le texte (le serveur n'accepte pas de guillemet à l'intérieur)."
-            : 'Entourez le texte de guillemets s\'il contient des espaces : "mon texte".'}
+            ? t("console.completion.closeQuotes")
+            : t("console.completion.useQuotes")}
         </p>
       )}
     </div>
@@ -89,7 +90,7 @@ function SuggestionRow({ s, active, onPick }: { s: Suggestion; active: boolean; 
       {s.detail && <span className="min-w-0 truncate font-mono text-xs text-zinc-500">{s.detail}</span>}
       <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-xs text-zinc-500">
         {s.description && <span className="hidden max-w-80 truncate md:inline">{s.description}</span>}
-        {s.variants !== undefined && s.variants > 1 && <span>+{s.variants - 1} variante(s)</span>}
+        {s.variants !== undefined && s.variants > 1 && <span>{t("console.completion.variants", { n: s.variants - 1 })}</span>}
         {active && <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 font-sans text-[10px] text-zinc-400">Tab</kbd>}
       </span>
     </li>
@@ -111,7 +112,7 @@ export function CompletionPanel({ suggestions, hint, active, onPick }: Completio
     <div className="absolute inset-x-3 bottom-full mb-2 overflow-hidden rounded-xl bg-zinc-900 shadow-2xl ring-1 shadow-black/50 ring-white/10">
       {showHint && (
         <div className="border-b border-white/[0.06] px-3 py-2.5">
-          <p className="mb-1.5 text-[11px] font-medium tracking-wide text-zinc-500 uppercase">Syntaxe</p>
+          <p className="mb-1.5 text-[11px] font-medium tracking-wide text-zinc-500 uppercase">{t("console.completion.syntax")}</p>
           <ul className="flex flex-col gap-1">
             {hint.syntaxes.slice(0, 4).map((args, i) => (
               <Syntax key={i} command={hint.command} args={args} current={hint.current} />

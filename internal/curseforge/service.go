@@ -21,12 +21,12 @@ import (
 
 // Errors reported to the operator.
 var (
-	ErrGameNotFound   = errors.New("Hytale est introuvable dans le catalogue CurseForge")
-	ErrNoModpacks     = errors.New("CurseForge ne propose pas de catégorie de modpacks pour Hytale")
-	ErrNoFile         = errors.New("aucun fichier téléchargeable pour ce projet")
-	ErrBusy           = errors.New("une opération CurseForge est déjà en cours")
-	ErrChecksum       = errors.New("somme de contrôle incorrecte, téléchargement rejeté")
-	ErrNotAModArchive = errors.New("le fichier CurseForge n'est pas un .jar/.zip installable")
+	ErrGameNotFound   = errors.New("Hytale is not in the CurseForge catalog")
+	ErrNoModpacks     = errors.New("CurseForge has no modpack category for Hytale")
+	ErrNoFile         = errors.New("no downloadable file for this project")
+	ErrBusy           = errors.New("a CurseForge operation is already running")
+	ErrChecksum       = errors.New("checksum mismatch, download rejected")
+	ErrNotAModArchive = errors.New("the CurseForge file is not an installable .jar/.zip")
 )
 
 // DownloadDisabledError reports a file its author keeps off third-party tools.
@@ -36,11 +36,10 @@ type DownloadDisabledError struct {
 }
 
 func (e *DownloadDisabledError) Error() string {
-	msg := fmt.Sprintf("l'auteur de « %s » interdit le téléchargement par des outils tiers", e.Name)
 	if e.URL != "" {
-		msg += " : téléchargez-le sur " + e.URL + " puis ajoutez le fichier manuellement"
+		return fmt.Sprintf("the author of “%s” does not allow downloads by third-party tools: download it from %s, then add the file manually", e.Name, e.URL)
 	}
-	return msg
+	return fmt.Sprintf("the author of “%s” does not allow downloads by third-party tools", e.Name)
 }
 
 // Deps wires the Service.
@@ -105,7 +104,7 @@ func (s *Service) Status(ctx context.Context) Status {
 func (s *Service) SetKey(ctx context.Context, key string) error {
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return errors.New("clé API vide")
+		return errors.New("empty API key")
 	}
 	probe := NewClient(s.Client.http, s.Client.baseURL, func() string { return key })
 	if _, err := probe.Games(ctx); err != nil {
@@ -403,7 +402,7 @@ func (s *Service) installDependencies(ctx context.Context, saveID string, file F
 				}
 			}
 		}
-		res.Warnings = append(res.Warnings, fmt.Sprintf("dépendance %d non installée : %v", dep.ModID, err))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("dependency %d not installed: %v", dep.ModID, err))
 	}
 }
 

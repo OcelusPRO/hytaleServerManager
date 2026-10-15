@@ -12,6 +12,53 @@ export interface ServerStatus {
   activeSaveId: string;
   installing: boolean;
   playerCount: number;
+  hostWarnings: HostWarning[];
+}
+
+/** A host problem reported by the game server (see internal/hostcheck). */
+export interface HostWarning {
+  kind: "udpReceiveBuffer" | string;
+  values?: Record<string, number>;
+  seenAt: string;
+}
+
+export type MetricsRange = "1h" | "6h" | "24h" | "7d" | "14d";
+
+/** One period of the resource history (see internal/metrics). */
+export interface MetricPoint {
+  t: number; // Unix seconds
+  cpu?: number; // cores used (1.5 = 150 %)
+  memMb?: number;
+  memMaxMb?: number;
+  ccpu?: number; // whole container
+  cmem?: number;
+  cmemMax?: number;
+  players: number;
+  running: number; // seconds per state
+  sleeping: number;
+  stopped: number;
+}
+
+export interface MetricsSeries {
+  from: number;
+  to: number;
+  step: number;
+  points: MetricPoint[] | null;
+  summary: {
+    runningSeconds: number;
+    sleepingSeconds: number;
+    stoppedSeconds: number;
+    peakMemMb?: number;
+    avgCpu?: number;
+    containerPeakMemMb?: number;
+    containerAvgCpu?: number;
+    /** Container usage per server state. */
+    states?: Partial<Record<"running" | "sleeping" | "stopped", { cpu?: number; memMb?: number }>>;
+    peakPlayers: number;
+  };
+  cpuCount: number;
+  processMetrics: boolean;
+  containerMetrics: boolean;
 }
 
 export type LoginState = "idle" | "pending" | "succeeded" | "failed" | "cancelled";
@@ -228,6 +275,7 @@ export interface ServerSettings {
   autoUpdateForceHours: number;
   sleepEnabled: boolean;
   sleepIdleMinutes: number;
+  gameLanguage: "en" | "fr";
   gameVersionPin: string;
 }
 

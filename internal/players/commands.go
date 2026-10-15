@@ -26,8 +26,8 @@ const (
 // Command errors.
 var (
 	ErrUnknownAction = errors.New("action inconnue")
-	ErrInvalidPlayer = errors.New("nom de joueur invalide")
-	ErrInvalidReason = errors.New("raison invalide")
+	ErrInvalidPlayer = errors.New("invalid player name")
+	ErrInvalidReason = errors.New("invalid reason")
 )
 
 var playerPattern = regexp.MustCompile(`^[A-Za-z0-9_]{1,32}$`)

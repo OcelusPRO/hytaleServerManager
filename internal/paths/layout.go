@@ -44,6 +44,10 @@ func (l Layout) HomeDir() string { return filepath.Join(l.root, "home") }
 // TmpDir is a scratch directory on the same filesystem (atomic renames).
 func (l Layout) TmpDir() string { return filepath.Join(l.root, "tmp") }
 
+// MachineIDFile is the machine identifier of the container: the image links
+// /etc/machine-id to it, the game server reads it as its hardware id.
+func (l Layout) MachineIDFile() string { return filepath.Join(l.root, "machine-id") }
+
 // File returns a path inside the manager directory.
 func (l Layout) File(name string) string { return filepath.Join(l.ManagerDir(), name) }
 

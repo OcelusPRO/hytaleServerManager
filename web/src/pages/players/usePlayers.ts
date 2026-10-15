@@ -2,6 +2,7 @@ import { useFeedback } from "../../components/ui/feedback";
 import { usePolling } from "../../hooks/usePolling";
 import { api } from "../../lib/api";
 import type { AccessList, PlayerAction, PlayersResponse } from "../../lib/types";
+import { translate as t } from "../../lib/i18n";
 
 /** Player data of the active world and the actions that modify it. */
 export function usePlayers() {
@@ -22,7 +23,7 @@ export function usePlayers() {
     remove: (list: AccessList, uuid: string, success: string) =>
       withRefresh(() => api.post("/api/players/remove", { list, uuid }), success),
     setWhitelist: (enabled: boolean) =>
-      withRefresh(() => api.put("/api/players/whitelist", { enabled }), enabled ? "Whitelist activée" : "Whitelist désactivée"),
+      withRefresh(() => api.put("/api/players/whitelist", { enabled }), enabled ? t("players.whitelist.enabled") : t("players.whitelist.disabled")),
   };
 }
 

@@ -40,6 +40,28 @@ depuis une interface web protégée par mot de passe (port 8080).
 - **Mods par monde**, **sauvegardes** (création, téléchargement, restauration,
   import), **console temps réel**, **joueurs** (expulsion, ban, op, whitelist),
   **cycle de vie** (démarrage auto, redémarrage après plantage, arrêt propre).
+- **Ressources** : graphiques de la mémoire et du CPU du processus Java (avec la
+  limite `-Xmx`) et du conteneur entier (gestionnaire compris, lu dans son
+  cgroup comme `docker stats`), des joueurs connectés et de l'état du serveur
+  (en marche, en veille, arrêté) sur 1 h à 14 jours, avec la consommation
+  moyenne du conteneur dans chaque état. Mesures toutes les 5 s, agrégées par
+  minute et conservées 14 jours dans `/data/manager/metrics.json`.
+- **Passkeys** : connexion au panneau avec l'empreinte, le visage ou le code
+  d'un appareil (WebAuthn, vérifié par la bibliothèque
+  [go-webauthn](https://github.com/go-webauthn/webauthn)). Une fois une passkey
+  enregistrée, la connexion par mot de passe peut être désactivée.
+  `HSM_RESET_PASSWORD=true` régénère le mot de passe **et** supprime les
+  passkeys (recours en cas de perte). Les passkeys exigent HTTPS ou
+  `http://localhost`.
+- **Langues** : interface en anglais par défaut, en français si le navigateur
+  est en français ; le choix se change dans **Paramètres** et s'applique à
+  l'enregistrement. Le serveur s'exprime en anglais et l'interface traduit ses
+  messages (erreurs, console). La langue des annonces en jeu (comptes à rebours
+  des mises à jour) se règle dans **Paramètres**.
+- **Diagnostics de l'hôte** : le panneau signale un tampon UDP du système trop
+  petit (`net.core.rmem_max`) avec les commandes à lancer sur l'hôte. Le
+  conteneur fournit au serveur un identifiant machine stable
+  (`/data/machine-id`, lié à `/etc/machine-id`).
 
 ## Démarrage rapide
 
@@ -70,7 +92,7 @@ Les joueurs se connectent en **UDP 5520** (QUIC) : ouvrez/redirigez ce port en U
 | `HSM_SECURE_COOKIES`  | `false` | Cookie `Secure` (à activer derrière HTTPS) |
 | `HSM_TRUST_PROXY`     | `false` | Utiliser `X-Forwarded-For` pour l'anti-bruteforce |
 | `HSM_MAX_UPLOAD_MB`   | `1024`  | Taille max d'un mod ou d'une archive importée |
-| `HSM_RESET_PASSWORD`  | `false` | Régénère le mot de passe au démarrage (à retirer ensuite) |
+| `HSM_RESET_PASSWORD`  | `false` | Régénère le mot de passe et supprime les passkeys au démarrage (à retirer ensuite) |
 | `HSM_BINDHOOK_LIB`    | `/usr/local/lib/hsm-bindhook.so` | Bibliothèque d'interception du `bind()` (mise en veille) |
 | `HSM_SLEEP_TEST_WAKE_DELAY` | — | Test uniquement : retarde le démarrage après un réveil (ex. `90s`) pour mesurer la patience des clients |
 
@@ -156,7 +178,7 @@ backups/    archives zip par monde
 
 ## Développement
 
-Backend (Go 1.26, aucune dépendance externe) :
+Backend (Go 1.26 ; seule dépendance externe : go-webauthn, pour les passkeys) :
 
 ```bash
 go test ./...
@@ -188,12 +210,14 @@ Architecture (`internal/`) :
 | `gameserver` | Processus serveur, console, construction de la ligne de commande |
 | `lifecycle` | Orchestration démarrage/arrêt/redémarrage et prérequis |
 | `sleep` | Mise en veille du serveur vide et réveil à la connexion |
+| `metrics`, `hostcheck` | Historique des ressources, avertissements liés à l'hôte |
+| `passkey` | Passkeys (WebAuthn) du panneau |
 | `saves` | Mondes, mods par monde, sauvegardes |
 | `players` | Commandes de modération, fichiers de listes, joueurs connectés |
 | `settings` | Réglages modifiables depuis l'interface |
 | `archive`, `fsutil`, `secretbox` | Archives sûres, écritures atomiques, chiffrement |
 | `httpapi` | API REST, middlewares de sécurité, SSE |
 
-Interface (`web/src/`) : `lib/` (client API, types, formatage), `hooks/`
+Interface (`web/src/`) : `lib/` (client API, types, formatage, traductions `i18n.ts`), `locales/` (textes anglais et français par section, catalogue des messages du serveur généré), `hooks/`
 (polling, statut global, console SSE, routage), `components/ui/` (primitives),
 `components/hytale/` (connexion Hytale, étapes d'installation), `pages/`.

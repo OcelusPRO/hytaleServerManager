@@ -6,6 +6,7 @@ import type { HytaleProfile } from "../../lib/types";
 import { Button } from "../ui/Button";
 import { Field, Select } from "../ui/Field";
 import { useFeedback } from "../ui/feedback";
+import { translate as t } from "../../lib/i18n";
 
 /** Lets the operator choose which game profile the server runs as. */
 export function ProfilePicker() {
@@ -16,13 +17,13 @@ export function ProfilePicker() {
   const value = selected ?? status?.hytale.profileUuid ?? profiles?.[0]?.uuid ?? "";
 
   const save = async () => {
-    await run(() => api.post("/api/hytale/auth/profile", { uuid: value }), "Profil sélectionné");
+    await run(() => api.post("/api/hytale/auth/profile", { uuid: value }), t("hytale.profile.selected"));
     await refresh();
   };
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <Field label="Profil utilisé par le serveur" className="min-w-64 flex-1">
+      <Field label={t("hytale.profile.label")} className="min-w-64 flex-1">
         {(id) => (
           <Select id={id} value={value} onChange={(e) => setSelected(e.target.value)} disabled={!profiles}>
             {profiles?.map((p) => (
@@ -34,7 +35,7 @@ export function ProfilePicker() {
         )}
       </Field>
       <Button variant="primary" onClick={save} disabled={!value || value === status?.hytale.profileUuid}>
-        Utiliser ce profil
+        {t("hytale.profile.use")}
       </Button>
     </div>
   );

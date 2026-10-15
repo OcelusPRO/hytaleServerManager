@@ -4,6 +4,7 @@ import { errorMessage } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { Button } from "./Button";
 import { Field, Input } from "./Field";
+import { translate as t, useI18n } from "../../lib/i18n";
 
 // ---------------------------------------------------------------- toasts
 
@@ -52,6 +53,7 @@ export function useFeedback(): Feedback {
 let nextToastId = 1;
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
+  useI18n(); // dialogs follow the interface language
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [dialog, setDialog] = useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(null);
   const [promptState, setPromptState] = useState<(PromptOptions & { resolve: (v: string | null) => void }) | null>(null);
@@ -121,7 +123,7 @@ function Toast({ item, onClose }: { item: ToastItem; onClose: () => void }) {
     <div className="pointer-events-auto flex animate-fade-in items-start gap-3 rounded-xl bg-zinc-900 px-4 py-3 shadow-xl ring-1 shadow-black/40 ring-white/10">
       <Icon className={cn("mt-0.5 size-4 shrink-0", item.kind === "success" ? "text-emerald-400" : "text-red-400")} />
       <p className="min-w-0 flex-1 text-sm text-zinc-200">{item.message}</p>
-      <button type="button" onClick={onClose} className="cursor-pointer text-zinc-500 hover:text-zinc-300" aria-label="Fermer">
+      <button type="button" onClick={onClose} className="cursor-pointer text-zinc-500 hover:text-zinc-300" aria-label={t("shell.dialog.close")}>
         <X className="size-4" />
       </button>
     </div>
@@ -170,10 +172,10 @@ function PromptDialog({ options, onClose }: { options: PromptOptions; onClose: (
         </Field>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onClose(null)}>
-            Annuler
+            {t("shell.dialog.cancel")}
           </Button>
           <Button type="submit" variant="primary" disabled={!value.trim() && !options.optional}>
-            {options.confirmLabel ?? "Valider"}
+            {options.confirmLabel ?? t("shell.dialog.ok")}
           </Button>
         </div>
       </form>
@@ -191,10 +193,10 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose:
       {options.message && <div className="mt-2 text-sm text-zinc-400">{options.message}</div>}
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="ghost" onClick={() => onClose(false)}>
-          Annuler
+          {t("shell.dialog.cancel")}
         </Button>
         <Button ref={confirmRef} variant={options.danger ? "danger" : "primary"} onClick={() => onClose(true)}>
-          {options.confirmLabel ?? "Confirmer"}
+          {options.confirmLabel ?? t("shell.dialog.confirm")}
         </Button>
       </div>
     </Modal>

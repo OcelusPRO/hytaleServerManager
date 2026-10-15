@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,12 +20,16 @@ import (
 	"hytale-server-manager/internal/commandcatalog"
 	"hytale-server-manager/internal/config"
 	"hytale-server-manager/internal/curseforge"
+	"hytale-server-manager/internal/fsutil"
 	"hytale-server-manager/internal/gameserver"
+	"hytale-server-manager/internal/hostcheck"
 	"hytale-server-manager/internal/httpapi"
 	"hytale-server-manager/internal/hytaleapi"
 	"hytale-server-manager/internal/hytaleauth"
 	"hytale-server-manager/internal/install"
 	"hytale-server-manager/internal/lifecycle"
+	"hytale-server-manager/internal/metrics"
+	"hytale-server-manager/internal/passkey"
 	"hytale-server-manager/internal/paths"
 	"hytale-server-manager/internal/players"
 	"hytale-server-manager/internal/saves"
@@ -35,7 +41,7 @@ import (
 
 const (
 	consoleHistoryLines = 5000
-	defaultSaveName     = "Monde principal"
+	defaultSaveName     = "Main world"
 )
 
 // app holds the wired services.
@@ -54,6 +60,8 @@ type app struct {
 	backups     *saves.BackupStore
 	updater     *autoupdate.Updater
 	sleeper     *sleep.Sleeper
+	hostChecks  *hostcheck.Monitor
+	metrics     *metrics.Collector
 }
 
 func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
@@ -61,10 +69,24 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 	if err := layout.EnsureAll(); err != nil {
 		return nil, err
 	}
+	if err := ensureMachineID(layout.MachineIDFile()); err != nil {
+		logger.Warn("could not create the machine id", "error", err)
+	}
 
 	credentials, notice, err := bootstrapPassword(cfg, layout, logger)
 	if err != nil {
 		return nil, err
+	}
+	passkeys, err := passkey.Open(layout.File("passkeys.json"))
+	if err != nil {
+		return nil, err
+	}
+	if cfg.ResetPassword {
+		// Recovery path: the new password must be enough to get back in.
+		if err := passkeys.Reset(); err != nil {
+			return nil, err
+		}
+		logger.Info("passkeys removed and password sign-in re-enabled (HSM_RESET_PASSWORD)")
 	}
 	settingsStore, err := settings.Open(layout.File("settings.json"))
 	if err != nil {
@@ -192,10 +214,26 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 
 	backupStore := saves.NewBackupStore(layout.BackupsDir(), layout.TmpDir(), saveStore, backupLimits)
 
+	hostChecks := hostcheck.NewMonitor()
+	collector := metrics.New(metrics.Deps{
+		Path: layout.File("metrics.json"),
+		Probe: func() metrics.Probe {
+			p := metrics.Probe{State: metrics.StateStopped, Players: tracker.Count()}
+			switch st := process.Status(); {
+			case process.Active():
+				p.State, p.PID = metrics.StateRunning, st.PID
+			case sleeper.Sleeping():
+				p.State = metrics.StateSleeping
+			}
+			return p
+		},
+	})
+
 	handler := httpapi.NewHandler(httpapi.Deps{
 		Config:         cfg,
 		Logger:         logger,
 		Credentials:    credentials,
+		Passkeys:       passkeys,
 		PasswordNotice: notice,
 		Sessions:       auth.NewSessionManager(12*time.Hour, 7*24*time.Hour),
 		LoginLimiter:   auth.NewLoginLimiter(5, 15*time.Minute, 15*time.Minute),
@@ -203,6 +241,8 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		Provisioner:    provisioner,
 		Controller:     controller,
 		Sleep:          sleeper,
+		HostWarnings:   hostChecks,
+		Metrics:        collector,
 		Console:        console,
 		Players:        tracker,
 		Commands:       commands,
@@ -223,6 +263,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 				Enabled:    st.AutoUpdate,
 				IdleAfter:  time.Duration(st.AutoUpdateIdleMinutes) * time.Minute,
 				ForceAfter: time.Duration(st.AutoUpdateForceHours) * time.Hour,
+				Language:   st.GameLanguage,
 			}
 		},
 		Running:       controller.Running,
@@ -252,6 +293,8 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		playerSvc:   playerSvc,
 		updater:     updater,
 		sleeper:     sleeper,
+		hostChecks:  hostChecks,
+		metrics:     collector,
 		logger:      logger,
 		handler:     handler,
 		controller:  controller,
@@ -264,6 +307,20 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		settings:    settingsStore,
 		backups:     backupStore,
 	}, nil
+}
+
+// ensureMachineID creates the machine identifier the game server reads
+// through /etc/machine-id (a link to this file in the image): containers
+// have none, and a stable one survives the container being recreated.
+func ensureMachineID(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	id := make([]byte, 16)
+	if _, err := rand.Read(id); err != nil {
+		return err
+	}
+	return fsutil.WriteFileAtomic(path, []byte(hex.EncodeToString(id)+"\n"), 0o644)
 }
 
 // bindHookSocket returns the socket the sleep bind hook library talks to, or
@@ -298,8 +355,8 @@ func bootstrapPassword(cfg config.Config, layout paths.Layout, logger *slog.Logg
 		return nil, nil, err
 	}
 	fmt.Printf("\n================================================================\n"+
-		"  Mot de passe de l'interface de gestion : %s\n"+
-		"  (aussi enregistré dans %s jusqu'à son changement)\n"+
+		"  Management interface password: %s\n"+
+		"  (also saved in %s until it is changed)\n"+
 		"================================================================\n\n",
 		password, notice.Path())
 	logger.Info("panel password generated")
@@ -331,6 +388,7 @@ func (a *app) startBackground(ctx context.Context) {
 	go a.autosave(ctx)
 	go a.updater.Run(ctx)
 	go a.sleeper.Run(ctx)
+	go a.metrics.Run(ctx)
 	if err := a.ensureDefaultSave(); err != nil {
 		a.logger.Warn("could not create the default world", "error", err)
 	}
@@ -370,7 +428,7 @@ func (a *app) autoStart(ctx context.Context) {
 		}
 	}
 	if err := a.controller.Start(ctx); err != nil {
-		a.console.System("Démarrage automatique impossible : " + err.Error())
+		a.console.System("Automatic start failed: " + err.Error())
 		a.logger.Warn("auto start failed", "error", err)
 	}
 }
@@ -401,7 +459,7 @@ func (a *app) autosave(ctx context.Context) {
 			continue // nothing changes while the server is stopped
 		}
 		if _, err := a.backups.CreateAuto(st.ActiveSaveID, st.AutosaveSlots); err != nil {
-			a.console.System("Autosave impossible : " + err.Error())
+			a.console.System("Autosave failed: " + err.Error())
 			a.logger.Warn("autosave failed", "error", err)
 			continue
 		}
@@ -421,6 +479,7 @@ func (a *app) followConsole(ctx context.Context) {
 			if l.Stream == gameserver.StreamStdout || l.Stream == gameserver.StreamStderr {
 				a.tracker.Observe(l.Text)
 				a.sleeper.ObserveLine(l.Text)
+				a.hostChecks.Observe(l.Text)
 			}
 		}
 	}

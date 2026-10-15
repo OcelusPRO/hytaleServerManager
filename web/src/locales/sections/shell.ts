@@ -1,0 +1,76 @@
+import type { Shape } from "../shape";
+
+// Application shell and shared components.
+export const en = {
+  sidebar: { server: "Server", logout: "Sign out" },
+  dialog: { ok: "OK", confirm: "Confirm", cancel: "Cancel", close: "Close" },
+  setup: {
+    java: "Downloading Java",
+    checking: "Looking for the latest version",
+    downloading: "Downloading the Hytale server",
+    extracting: "Installing the Hytale server",
+  },
+  controls: {
+    killTitle: "Force the server to stop?",
+    killMessage: "The process is killed immediately, without saving the world.",
+    kill: "Force stop",
+    killed: "Server stopped forcefully",
+    cancelSleep: "Stop",
+    cancelSleepHint: "Ends sleep mode: the server will no longer start on its own",
+    sleepCancelled: "Sleep cancelled, server stopped",
+    wake: "Wake up",
+    waking: "Waking the server up",
+    start: "Start",
+    starting: "Starting the server",
+    restart: "Restart",
+    restarted: "Server restarted",
+    stop: "Stop",
+    stopped: "Server stopped",
+  },
+  config: {
+    unset: "(not set)",
+    tooLarge: "Number too large to be edited here",
+    item: "Item {n}",
+    removeItem: "Remove item {n}",
+    add: "Add",
+    invalidJson: "Invalid JSON: this value will not be saved.",
+  },
+  job: { failed: "{title}: failed", done: "{title}: done", close: "Close" },
+};
+
+export const fr: Shape<typeof en> = {
+  sidebar: { server: "Serveur", logout: "Se déconnecter" },
+  dialog: { ok: "Valider", confirm: "Confirmer", cancel: "Annuler", close: "Fermer" },
+  setup: {
+    java: "Téléchargement de Java",
+    checking: "Recherche de la dernière version",
+    downloading: "Téléchargement du serveur Hytale",
+    extracting: "Installation du serveur Hytale",
+  },
+  controls: {
+    killTitle: "Forcer l'arrêt du serveur ?",
+    killMessage: "Le processus est tué immédiatement, sans sauvegarde du monde.",
+    kill: "Forcer l'arrêt",
+    killed: "Serveur arrêté de force",
+    cancelSleep: "Arrêter",
+    cancelSleepHint: "Arrête la veille : le serveur ne redémarrera plus tout seul",
+    sleepCancelled: "Veille annulée, serveur arrêté",
+    wake: "Réveiller",
+    waking: "Réveil du serveur",
+    start: "Démarrer",
+    starting: "Démarrage du serveur",
+    restart: "Redémarrer",
+    restarted: "Serveur redémarré",
+    stop: "Arrêter",
+    stopped: "Serveur arrêté",
+  },
+  config: {
+    unset: "(non défini)",
+    tooLarge: "Nombre trop grand pour être modifié ici",
+    item: "Élément {n}",
+    removeItem: "Retirer l'élément {n}",
+    add: "Ajouter",
+    invalidJson: "JSON invalide : cette valeur ne sera pas enregistrée.",
+  },
+  job: { failed: "{title} : échec", done: "{title} : terminé", close: "Fermer" },
+};

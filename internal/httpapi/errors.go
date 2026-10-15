@@ -78,7 +78,7 @@ func classify(err error) (int, string) {
 	}
 	var apiErr *hytaleapi.APIError
 	if errors.As(err, &apiErr) {
-		return http.StatusBadGateway, "Hytale a refusé la requête : " + apiErr.Error()
+		return http.StatusBadGateway, "Hytale rejected the request: " + apiErr.Error()
 	}
-	return http.StatusInternalServerError, "erreur interne, consultez les journaux du conteneur"
+	return http.StatusInternalServerError, "internal error, see the container logs"
 }

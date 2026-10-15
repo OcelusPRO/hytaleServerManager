@@ -40,6 +40,8 @@ type Config struct {
 	Enabled    bool
 	IdleAfter  time.Duration // empty server for this long => update now
 	ForceAfter time.Duration // update pending for this long => countdown
+	// Language of the announcements to players ("en", "fr").
+	Language string
 }
 
 // Deps lists the collaborators of the Updater.
@@ -112,7 +114,7 @@ func (u *Updater) tick(ctx context.Context) {
 			u.idleSince = now
 		}
 		if now.Sub(u.idleSince) >= cfg.IdleAfter {
-			u.apply(ctx, "serveur vide depuis "+cfg.IdleAfter.String())
+			u.apply(ctx, "server empty for "+cfg.IdleAfter.String())
 		}
 		return
 	}
@@ -123,20 +125,21 @@ func (u *Updater) tick(ctx context.Context) {
 			return
 		}
 		u.deadline = now.Add(countdownLength)
-		u.log(fmt.Sprintf("Mise à jour en attente depuis plus de %s : compte à rebours lancé.", cfg.ForceAfter))
+		u.log(fmt.Sprintf("Update pending for more than %s: countdown started.", cfg.ForceAfter))
 	}
 	remaining := u.deadline.Sub(now)
 	if remaining <= 0 {
-		u.alert("Arrêt du serveur", "Mise à jour en cours, il redémarre dans un instant", true)
-		u.apply(ctx, "compte à rebours terminé")
+		t := textsFor(cfg.Language)
+		u.alert(t.stoppingTitle, t.stoppingSubtitle, true)
+		u.apply(ctx, "countdown over")
 		return
 	}
-	u.announce(remaining)
+	u.announce(remaining, textsFor(cfg.Language))
 }
 
 // announce tells the players about the smallest warning threshold crossed
 // since the last tick, so a delayed tick never replays old warnings.
-func (u *Updater) announce(remaining time.Duration) {
+func (u *Updater) announce(remaining time.Duration, t playerTexts) {
 	var due time.Duration
 	for _, w := range warnings {
 		if remaining <= w && !u.warned[w] {
@@ -145,7 +148,7 @@ func (u *Updater) announce(remaining time.Duration) {
 		}
 	}
 	if due > 0 {
-		u.alert("Mise à jour du serveur dans "+describe(due), "Le serveur va redémarrer", due <= time.Minute)
+		u.alert(fmt.Sprintf(t.updateIn, t.describe(due)), t.restarting, due <= time.Minute)
 	}
 }
 
@@ -153,34 +156,34 @@ func (u *Updater) announce(remaining time.Duration) {
 func (u *Updater) apply(ctx context.Context, reason string) {
 	u.reset()
 	u.retryAfter = u.d.Now().Add(retryDelay)
-	u.log("Mise à jour automatique (" + reason + ") : arrêt du serveur…")
+	u.log(fmt.Sprintf("Automatic update (%s): stopping the server…", reason))
 
 	// Native save while the server is still up; stopping saves again.
 	if err := u.d.Send("/world save"); err != nil {
-		u.log("Sauvegarde native impossible : " + err.Error())
+		u.log("Native save failed: " + err.Error())
 	} else {
 		u.d.Wait(nativeSaveWait)
 	}
 	if err := u.d.Stop(); err != nil {
-		u.log("Mise à jour automatique abandonnée, arrêt impossible : " + err.Error())
+		u.log("Automatic update aborted, could not stop the server: " + err.Error())
 		return
 	}
 	if err := u.d.Backup(); err != nil {
-		u.log("Mise à jour automatique abandonnée, sauvegarde impossible : " + err.Error())
+		u.log("Automatic update aborted, backup failed: " + err.Error())
 		u.restart(ctx)
 		return
 	}
-	u.log("Sauvegarde terminée, installation de la mise à jour…")
+	u.log("Backup done, installing the update…")
 	err := u.d.RequestUpdate(func() { u.restart(context.Background()) })
 	if err != nil {
-		u.log("Mise à jour automatique impossible : " + err.Error())
+		u.log("Automatic update failed: " + err.Error())
 		u.restart(ctx)
 	}
 }
 
 func (u *Updater) restart(ctx context.Context) {
 	if err := u.d.Start(ctx); err != nil {
-		u.log("Redémarrage après mise à jour impossible : " + err.Error())
+		u.log("Could not restart after the update: " + err.Error())
 	}
 }
 
@@ -202,7 +205,7 @@ func (u *Updater) alert(title, subtitle string, major bool) {
 	}
 	for _, c := range commands {
 		if err := u.d.Send(c); err != nil {
-			u.log("Annonce impossible : " + err.Error())
+			u.log("Announcement failed: " + err.Error())
 			return
 		}
 	}
@@ -216,17 +219,5 @@ func sanitize(text string) string {
 func (u *Updater) log(message string) {
 	if u.d.Log != nil {
 		u.d.Log(message)
-	}
-}
-
-func describe(d time.Duration) string {
-	switch {
-	case d >= time.Minute && d%time.Minute == 0:
-		if d == time.Minute {
-			return "1 minute"
-		}
-		return fmt.Sprintf("%d minutes", int(d/time.Minute))
-	default:
-		return fmt.Sprintf("%d secondes", int(d/time.Second))
 	}
 }

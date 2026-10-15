@@ -9,10 +9,13 @@ import { closeLoginPopup } from "./lib/loginPopup";
 import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { paths, ROUTES } from "./routes";
+import { translate as t, useI18n } from "./lib/i18n";
 
 type Session = "loading" | "anonymous" | "authenticated";
 
 export function App() {
+  // Subscribes the whole tree to the interface language.
+  useI18n();
   const [session, setSession] = useState<Session>("loading");
 
   useEffect(() => {
@@ -70,10 +73,11 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const { run } = useFeedback();
   const { pathname } = useLocation();
   const current = ROUTES.find((r) => r.path === pathname);
+  const { lang } = useI18n();
 
   useEffect(() => {
-    document.title = current ? `${current.label} · Hytale Server Manager` : "Hytale Server Manager";
-  }, [current]);
+    document.title = current ? `${t(current.label)} · Hytale Server Manager` : "Hytale Server Manager";
+  }, [current, lang]);
 
   return (
     <div className="min-h-dvh">

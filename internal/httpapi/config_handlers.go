@@ -47,7 +47,7 @@ func (a *api) readConfig(w http.ResponseWriter, r *http.Request) {
 func (a *api) updateConfig(w http.ResponseWriter, r *http.Request) {
 	saveID := r.PathValue("id")
 	if a.deps.Controller.UsesSave(saveID) {
-		writeError(w, a.log, errConflict("le serveur utilise ce monde et réécrit ses fichiers de configuration : arrêtez-le avant de modifier la configuration"))
+		writeError(w, a.log, errConflict("the server is using this world and rewrites its configuration files: stop it before changing the configuration"))
 		return
 	}
 	dir, err := a.deps.Saves.Dir(saveID)

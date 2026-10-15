@@ -10,8 +10,9 @@ import { usePolling } from "../../hooks/usePolling";
 import { api, errorMessage, seg } from "../../lib/api";
 import { diffConfig, setAtPath } from "../../lib/configSchema";
 import type { ConfigFile, ConfigKind, JsonObject, JsonValue } from "../../lib/types";
+import { translate as t, translatePlural as tp } from "../../lib/i18n";
 
-const KIND_LABEL: Record<ConfigKind, string> = { server: "Serveur", world: "Mondes du jeu", mod: "Mods" };
+const KIND_LABEL = { server: "worlds.config.kindServer", world: "worlds.config.kindWorld", mod: "worlds.config.kindMod" } as const satisfies Record<ConfigKind, string>;
 
 interface ConfigPanelProps {
   saveId: string;
@@ -36,8 +37,8 @@ export function ConfigPanel({ saveId, inUse }: ConfigPanelProps) {
       <div className="p-5">
         <EmptyState
           icon={Settings2}
-          title="Aucun fichier de configuration"
-          description="Les fichiers de configuration sont créés par le serveur au premier démarrage de ce monde."
+          title={t("worlds.config.empty")}
+          description={t("worlds.config.emptyHint")}
         />
       </div>
     );
@@ -52,13 +53,13 @@ export function ConfigPanel({ saveId, inUse }: ConfigPanelProps) {
   return (
     <div className="flex flex-col gap-4 p-5">
       {inUse && (
-        <Alert tone="warning" title="Serveur en cours d'exécution">
-          Le serveur réécrit ses fichiers de configuration : arrêtez-le pour modifier. Les changements s'appliquent au prochain démarrage.
+        <Alert tone="warning" title={t("worlds.config.runningTitle")}>
+          {t("worlds.config.runningHint")}
         </Alert>
       )}
-      <Select value={selected.id} onChange={(e) => setFileId(e.target.value)} aria-label="Fichier de configuration" className="sm:max-w-sm">
+      <Select value={selected.id} onChange={(e) => setFileId(e.target.value)} aria-label={t("worlds.config.file")} className="sm:max-w-sm">
         {groups.map(([kind, items]) => (
-          <optgroup key={kind} label={KIND_LABEL[kind]}>
+          <optgroup key={kind} label={t(KIND_LABEL[kind])}>
             {items.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.group ? `${f.group} / ${f.label}` : f.label}
@@ -105,7 +106,7 @@ function ConfigEditor({ saveId, file, readOnly }: { saveId: string; file: Config
       await run(async () => {
         await api.patch(url, { changes });
         saved = true;
-      }, "Configuration enregistrée");
+      }, t("worlds.config.saved"));
       // On failure the draft is kept so nothing typed is lost.
       if (saved) await load();
     } finally {
@@ -123,13 +124,13 @@ function ConfigEditor({ saveId, file, readOnly }: { saveId: string; file: Config
       <ConfigForm kind={file.kind} value={draft} disabled={readOnly || saving} onChange={update} />
       <div className="sticky bottom-0 -mx-5 flex items-center justify-end gap-2 border-t border-white/[0.06] bg-zinc-900/95 px-5 py-3 backdrop-blur">
         <span className="mr-auto text-xs text-zinc-500">
-          {count === 0 ? "Aucune modification" : `${count} modification${count > 1 ? "s" : ""} non enregistrée${count > 1 ? "s" : ""}`}
+          {count === 0 ? t("worlds.config.noChange") : tp("worlds.config.changes", count)}
         </span>
         <Button icon={RotateCcw} disabled={count === 0 || saving} onClick={() => setDraft(original)}>
-          Annuler
+          {t("worlds.config.cancel")}
         </Button>
         <Button variant="primary" icon={Save} disabled={count === 0 || readOnly || saving} onClick={save}>
-          Enregistrer
+          {t("worlds.config.save")}
         </Button>
       </div>
     </div>

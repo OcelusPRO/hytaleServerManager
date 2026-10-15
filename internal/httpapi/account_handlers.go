@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+
+	"hytale-server-manager/internal/passkey"
 )
 
 // routeAccount registers the panel account endpoints.
@@ -17,7 +19,11 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 	if ok, wait := a.deps.LoginLimiter.Allow(ip); !ok {
 		w.Header().Set("Retry-After", fmt.Sprint(int(math.Ceil(wait.Seconds()))))
 		writeMessage(w, http.StatusTooManyRequests,
-			fmt.Sprintf("trop de tentatives, réessayez dans %d minute(s)", int(math.Ceil(wait.Minutes()))))
+			fmt.Sprintf("too many attempts, try again in %d minute(s)", int(math.Ceil(wait.Minutes()))))
+		return
+	}
+	if a.deps.Passkeys != nil && a.deps.Passkeys.PasswordDisabled() {
+		writeMessage(w, http.StatusForbidden, passkey.ErrPasswordDisabled.Error())
 		return
 	}
 	var body struct {
@@ -30,17 +36,11 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 	if !a.deps.Credentials.Verify(body.Password) {
 		a.deps.LoginLimiter.RecordFailure(ip)
 		a.log.Warn("failed panel login", "ip", ip)
-		writeMessage(w, http.StatusUnauthorized, "mot de passe incorrect")
+		writeMessage(w, http.StatusUnauthorized, "wrong password")
 		return
 	}
 	a.deps.LoginLimiter.RecordSuccess(ip)
-	token, err := a.deps.Sessions.Create()
-	if err != nil {
-		writeError(w, a.log, err)
-		return
-	}
-	a.setSessionCookie(w, token, a.deps.Sessions.IdleTTL())
-	writeNoContent(w)
+	a.startSession(w)
 }
 
 func (a *api) session(w http.ResponseWriter, r *http.Request) {

@@ -14,6 +14,7 @@ import { api } from "../lib/api";
 import { cn } from "../lib/cn";
 import { formatTime } from "../lib/format";
 import type { ConsoleStream, PlayersResponse } from "../lib/types";
+import { translate as t, translatePlural as tp, translateServer } from "../lib/i18n";
 
 const streamColors: Record<ConsoleStream, string> = {
   out: "text-zinc-300",
@@ -48,13 +49,13 @@ export function ConsolePage() {
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col gap-6 max-lg:h-[calc(100dvh-10rem)]">
       <PageHeader
-        title="Console"
-        description="Sortie du serveur en temps réel et envoi de commandes."
+        title={t("common.nav.console")}
+        description={t("pages.console.description")}
         actions={
           <>
             {catalog.building ? (
               <Badge tone="info" dot pulse>
-                Analyse des commandes…
+                {t("pages.console.analysing")}
               </Badge>
             ) : (
               <Button
@@ -63,16 +64,16 @@ export function ConsolePage() {
                 icon={RefreshCw}
                 disabled={!running}
                 onClick={catalog.rebuild}
-                title="Relire la liste des commandes du serveur (après l'ajout d'un mod)"
+                title={t("pages.console.reloadHint")}
               >
-                {catalog.entries.length ? `${catalog.commandCount} commandes` : "Charger les commandes"}
+                {catalog.entries.length ? tp("pages.console.commands", catalog.commandCount) : t("pages.console.load")}
               </Button>
             )}
             <Badge tone={connected ? "success" : "warning"} dot>
-              {connected ? "Connectée" : "Reconnexion…"}
+              {connected ? t("pages.console.connected") : t("pages.console.reconnecting")}
             </Badge>
             <Button size="sm" variant="ghost" icon={Eraser} onClick={clear}>
-              Effacer
+              {t("pages.console.clear")}
             </Button>
           </>
         }
@@ -85,17 +86,17 @@ export function ConsolePage() {
           role="log"
           aria-live="off"
         >
-          {lines.length === 0 && <p className="text-zinc-600">En attente de sortie du serveur…</p>}
+          {lines.length === 0 && <p className="text-zinc-600">{t("pages.console.waiting")}</p>}
           {lines.map((l) => (
             <div key={l.seq} className={cn("break-words whitespace-pre-wrap", streamColors[l.stream])}>
               <span className="mr-3 text-zinc-600 select-none">{formatTime(l.time)}</span>
-              {l.text}
+              {l.stream === "sys" ? translateServer(l.text) : l.text}
             </div>
           ))}
         </div>
         {!follow && (
           <Button size="sm" icon={ArrowDownToLine} className="absolute right-4 bottom-20 shadow-lg" onClick={() => setFollow(true)}>
-            Suivre
+            {t("pages.console.follow")}
           </Button>
         )}
         <CommandInput entries={catalog.entries} onlinePlayers={onlineNames} disabled={!running} onSubmit={send} />

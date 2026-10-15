@@ -3,6 +3,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Field";
+import { translate as t } from "../../lib/i18n";
 
 interface AccessListCardProps<T> {
   title: string;
@@ -63,7 +64,7 @@ export function AccessListCard<T>({
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={canAdd ? "Pseudo du joueur" : "Serveur arrêté"}
+          placeholder={canAdd ? t("players.namePlaceholder") : t("players.online.stopped")}
           pattern="[A-Za-z0-9_]{1,32}"
           disabled={!canAdd}
           aria-label={addLabel}

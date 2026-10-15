@@ -173,7 +173,7 @@ func findJavaHome(root string) (string, error) {
 		return "", err
 	}
 	if home == "" {
-		return "", errors.New("bin/java introuvable dans l'archive Java")
+		return "", errors.New("bin/java not found in the Java archive")
 	}
 	return home, nil
 }
@@ -185,6 +185,6 @@ func adoptiumArch() (string, error) {
 	case "arm64":
 		return "aarch64", nil
 	default:
-		return "", fmt.Errorf("architecture non supportée: %s", runtime.GOARCH)
+		return "", fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
 	}
 }

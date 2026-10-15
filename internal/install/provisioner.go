@@ -12,7 +12,7 @@ import (
 )
 
 // ErrServerRunning is returned when an update needs the server stopped.
-var ErrServerRunning = errors.New("arrêtez le serveur avant de le mettre à jour")
+var ErrServerRunning = errors.New("stop the server before updating it")
 
 // Activity is what the provisioner is currently doing.
 type Activity string
@@ -272,7 +272,7 @@ func (p *Provisioner) installLatest(ctx context.Context) {
 		return
 	}
 	if pin != "" && m.Version != pin {
-		p.fail(fmt.Errorf("la version %s n'est pas stockée et n'est plus téléchargeable (dernière version : %s)", pin, m.Version))
+		p.fail(fmt.Errorf("version %s is not stored and can no longer be downloaded (latest version: %s)", pin, m.Version))
 		return
 	}
 	if _, installed := p.game.Files(); installed && m.Version == p.game.Version() {

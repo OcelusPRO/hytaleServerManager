@@ -23,10 +23,10 @@ const (
 
 // Mod errors.
 var (
-	ErrInvalidModName = errors.New("nom de mod invalide (fichier .jar ou .zip)")
-	ErrNotAnArchive   = errors.New("le fichier n'est pas une archive .jar/.zip valide")
-	ErrModExists      = errors.New("un mod portant ce nom existe déjà")
-	ErrModTooLarge    = errors.New("le fichier dépasse la taille autorisée")
+	ErrInvalidModName = errors.New("invalid mod name (.jar or .zip file)")
+	ErrNotAnArchive   = errors.New("the file is not a valid .jar/.zip archive")
+	ErrModExists      = errors.New("a mod with this name already exists")
+	ErrModTooLarge    = errors.New("the file exceeds the allowed size")
 )
 
 var (

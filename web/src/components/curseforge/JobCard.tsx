@@ -5,6 +5,7 @@ import type { CurseForgeJob } from "../../lib/types";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Progress } from "../ui/Progress";
+import { translate as t, translateServer } from "../../lib/i18n";
 
 interface JobCardProps {
   jobId: string;
@@ -35,8 +36,8 @@ export function JobCard({ jobId, onFinished, onDismiss }: JobCardProps) {
     return (
       <div className="mx-5 mb-4 flex flex-col gap-2 rounded-xl bg-zinc-950/50 p-4 ring-1 ring-white/[0.06]">
         <div className="flex items-center justify-between gap-3 text-sm">
-          <span className="font-medium text-zinc-100">{j.title}</span>
-          <span className="truncate text-zinc-400">{j.message}</span>
+          <span className="font-medium text-zinc-100">{translateServer(j.title)}</span>
+          <span className="truncate text-zinc-400">{translateServer(j.message ?? "")}</span>
         </div>
         <Progress value={j.progress} />
       </div>
@@ -46,18 +47,18 @@ export function JobCard({ jobId, onFinished, onDismiss }: JobCardProps) {
     <div className="mx-5 mb-4">
       <Alert
         tone={j.state === "failed" ? "danger" : warnings.length > 0 ? "warning" : "success"}
-        title={j.state === "failed" ? `${j.title} : échec` : `${j.title} : terminé`}
+        title={t(j.state === "failed" ? "shell.job.failed" : "shell.job.done", { title: translateServer(j.title) })}
         action={
           <Button size="sm" variant="ghost" onClick={onDismiss}>
-            Fermer
+            {t("shell.job.close")}
           </Button>
         }
       >
-        {j.error && <p>{j.error}</p>}
+        {j.error && <p>{translateServer(j.error)}</p>}
         {warnings.length > 0 && (
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-zinc-400">
             {warnings.map((w, i) => (
-              <li key={i}>{w}</li>
+              <li key={i}>{translateServer(w)}</li>
             ))}
           </ul>
         )}

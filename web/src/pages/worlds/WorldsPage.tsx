@@ -14,6 +14,7 @@ import { cn } from "../../lib/cn";
 import { formatBytes } from "../../lib/format";
 import type { Save, SavesResponse } from "../../lib/types";
 import { WorldDetail } from "./WorldDetail";
+import { translate as t } from "../../lib/i18n";
 
 export function WorldsPage() {
   const { run, prompt } = useFeedback();
@@ -28,27 +29,27 @@ export function WorldsPage() {
     saves.find((s) => s.id === selectedId) ?? saves.find((s) => s.id === data?.activeSaveId) ?? saves[0];
 
   const create = async () => {
-    const name = await prompt({ title: "Nouveau monde", label: "Nom du monde", maxLength: 64, confirmLabel: "Créer" });
+    const name = await prompt({ title: t("worlds.page.newWorld"), label: t("worlds.page.newWorldName"), maxLength: 64, confirmLabel: t("worlds.page.create") });
     if (!name) return;
-    const save = await run(() => api.post<Save>("/api/saves", { name }), "Monde créé");
+    const save = await run(() => api.post<Save>("/api/saves", { name }), t("worlds.page.created"));
     await refresh();
     if (save) setSelectedId(save.id);
   };
 
   const importWorld = async (file: File) => {
     const name = await prompt({
-      title: "Importer un monde",
-      label: "Nom du monde importé",
+      title: t("worlds.page.importTitle"),
+      label: t("worlds.page.importName"),
       defaultValue: file.name.replace(/\.zip$/i, ""),
       maxLength: 64,
-      confirmLabel: "Importer",
+      confirmLabel: t("worlds.page.importConfirm"),
     });
     if (importInput.current) importInput.current.value = "";
     if (!name) return;
     setImportProgress(0);
     const save = await run(
       () => api.upload<Save>(`/api/saves/import?name=${seg(name)}`, file, setImportProgress),
-      "Monde importé",
+      t("worlds.page.imported"),
     );
     setImportProgress(null);
     await refresh();
@@ -58,15 +59,15 @@ export function WorldsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Mondes"
-        description="Chaque monde possède ses propres mods, joueurs et sauvegardes."
+        title={t("worlds.page.title")}
+        description={t("worlds.page.description")}
         actions={
           <>
             <Button icon={FileArchive} onClick={() => importInput.current?.click()} disabled={importProgress !== null}>
-              Importer (.zip)
+              {t("worlds.page.import")}
             </Button>
             <Button variant="primary" icon={Plus} onClick={create}>
-              Nouveau monde
+              {t("worlds.page.newWorld")}
             </Button>
           </>
         }
@@ -83,7 +84,7 @@ export function WorldsPage() {
       />
       {importProgress !== null && (
         <Card className="p-4">
-          <p className="text-sm text-zinc-300">Import du monde en cours…</p>
+          <p className="text-sm text-zinc-300">{t("worlds.page.importing")}</p>
           <Progress value={importProgress >= 1 ? -1 : importProgress} className="mt-2" />
         </Card>
       )}
@@ -92,11 +93,11 @@ export function WorldsPage() {
         <Card>
           <EmptyState
             icon={Globe}
-            title="Aucun monde"
-            description="Créez un monde : il sera généré au premier démarrage du serveur."
+            title={t("worlds.page.empty")}
+            description={t("worlds.page.emptyHint")}
             action={
               <Button variant="primary" icon={Plus} onClick={create}>
-                Nouveau monde
+                {t("worlds.page.newWorld")}
               </Button>
             }
           />
@@ -131,10 +132,10 @@ export function WorldsPage() {
                       </span>
                       {save.id === data?.runningSaveId ? (
                         <Badge tone="success" dot pulse>
-                          En ligne
+                          {t("worlds.page.online")}
                         </Badge>
                       ) : save.id === data?.activeSaveId ? (
-                        <Badge tone="brand">Actif</Badge>
+                        <Badge tone="brand">{t("worlds.page.active")}</Badge>
                       ) : null}
                     </button>
                   </li>

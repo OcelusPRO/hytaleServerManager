@@ -14,6 +14,7 @@ import { BackupsPanel } from "./BackupsPanel";
 import { ConfigPanel } from "./ConfigPanel";
 import { CurseForgePanel } from "./CurseForgePanel";
 import { ModsPanel } from "./ModsPanel";
+import { translate as t } from "../../lib/i18n";
 
 interface WorldDetailProps {
   save: Save;
@@ -43,27 +44,27 @@ export function WorldDetail({ save, active, inUse, serverRunning, onChange }: Wo
   const activate = async () => {
     await run(
       () => api.post(`${base}/activate`),
-      serverRunning ? "Monde activé : redémarrez le serveur pour l'utiliser" : "Monde activé",
+      serverRunning ? t("worlds.detail.activatedRestart") : t("worlds.detail.activated"),
     );
     await onChange();
   };
 
   const rename = async () => {
-    const name = await prompt({ title: "Renommer le monde", label: "Nom", defaultValue: save.name, maxLength: 64, confirmLabel: "Renommer" });
+    const name = await prompt({ title: t("worlds.detail.renameTitle"), label: t("worlds.detail.name"), defaultValue: save.name, maxLength: 64, confirmLabel: t("worlds.detail.rename") });
     if (!name) return;
-    await run(() => api.patch(base, { name }), "Monde renommé");
+    await run(() => api.patch(base, { name }), t("worlds.detail.renamed"));
     await onChange();
   };
 
   const remove = async () => {
     const ok = await confirm({
-      title: `Supprimer « ${save.name} » ?`,
-      message: "Le monde, ses mods et toutes ses sauvegardes seront définitivement supprimés.",
-      confirmLabel: "Supprimer",
+      title: t("worlds.detail.deleteTitle", { name: save.name }),
+      message: t("worlds.detail.deleteMessage"),
+      confirmLabel: t("worlds.detail.delete"),
       danger: true,
     });
     if (!ok) return;
-    await run(() => api.del(base), "Monde supprimé");
+    await run(() => api.del(base), t("worlds.detail.deleted"));
     await onChange();
   };
 
@@ -73,37 +74,37 @@ export function WorldDetail({ save, active, inUse, serverRunning, onChange }: Wo
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-lg font-semibold text-zinc-50">{save.name}</h2>
-            {active && <Badge tone="brand">Actif</Badge>}
+            {active && <Badge tone="brand">{t("worlds.detail.active")}</Badge>}
             {inUse && (
               <Badge tone="success" dot pulse>
-                En cours d'utilisation
+                {t("worlds.detail.inUse")}
               </Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-zinc-500">
-            Créé le {formatDate(save.createdAt)} · {formatBytes(save.sizeBytes)}
+            {t("worlds.detail.created", { date: formatDate(save.createdAt), size: formatBytes(save.sizeBytes) })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {!active && (
             <Button variant="primary" icon={Star} onClick={activate}>
-              Activer
+              {t("worlds.detail.activate")}
             </Button>
           )}
           <Button icon={Pencil} onClick={rename}>
-            Renommer
+            {t("worlds.detail.rename")}
           </Button>
-          <Button variant="danger" icon={Trash2} disabled={inUse} onClick={remove} aria-label="Supprimer le monde" title="Supprimer le monde" />
+          <Button variant="danger" icon={Trash2} disabled={inUse} onClick={remove} aria-label={t("worlds.detail.deleteWorld")} title={t("worlds.detail.deleteWorld")} />
         </div>
       </div>
       <Tabs
         value={tab}
         onChange={setTab}
         items={[
-          { value: "mods", label: "Mods", count: mods.data?.length },
-          { value: "curseforge", label: "CurseForge" },
-          { value: "config", label: "Configuration" },
-          { value: "backups", label: "Sauvegardes", count: backups.data?.length },
+          { value: "mods", label: t("worlds.detail.tabMods"), count: mods.data?.length },
+          { value: "curseforge", label: t("worlds.detail.tabCurseForge") },
+          { value: "config", label: t("worlds.detail.tabConfig") },
+          { value: "backups", label: t("worlds.detail.tabBackups"), count: backups.data?.length },
         ]}
       />
       {jobId && (

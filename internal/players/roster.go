@@ -3,6 +3,7 @@ package players
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -189,14 +190,14 @@ func readJSONFile(path string, v any) error {
 		return err
 	}
 	if info.Size() > maxDataFileBytes {
-		return errors.New(filepath.Base(path) + " est trop volumineux")
+		return fmt.Errorf("%s is too large", filepath.Base(path))
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, v); err != nil {
-		return errors.New(filepath.Base(path) + " est illisible")
+		return fmt.Errorf("%s is unreadable", filepath.Base(path))
 	}
 	return nil
 }

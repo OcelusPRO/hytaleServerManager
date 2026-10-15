@@ -17,9 +17,9 @@ import (
 
 // Errors.
 var (
-	ErrUnknownFile = errors.New("fichier de configuration introuvable")
-	ErrUnreadable  = errors.New("ce fichier de configuration n'est pas un objet JSON valide")
-	ErrBadChange   = errors.New("modification invalide")
+	ErrUnknownFile = errors.New("configuration file not found")
+	ErrUnreadable  = errors.New("this configuration file is not a valid JSON object")
+	ErrBadChange   = errors.New("invalid change")
 )
 
 const (

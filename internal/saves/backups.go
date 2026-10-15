@@ -24,7 +24,7 @@ const autoSuffix = "-auto"
 var backupIDPattern = regexp.MustCompile(`^\d{8}-\d{6}-[a-f0-9]{4}(-auto)?$`)
 
 // ErrInvalidBackupID is returned for malformed backup identifiers.
-var ErrInvalidBackupID = errors.New("identifiant de sauvegarde invalide")
+var ErrInvalidBackupID = errors.New("invalid backup identifier")
 
 // Backup describes an archived copy of a save.
 type Backup struct {

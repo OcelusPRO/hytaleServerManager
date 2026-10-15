@@ -3,6 +3,7 @@ import { useFeedback } from "../components/ui/feedback";
 import { api } from "../lib/api";
 import type { CommandEntry } from "../lib/commandCompletion";
 import { usePolling } from "./usePolling";
+import { translate } from "../lib/i18n";
 
 interface CatalogResponse {
   building: boolean;
@@ -24,7 +25,7 @@ export function useCommandCatalog() {
     commandCount,
     building: data?.building ?? false,
     rebuild: async () => {
-      await run(() => api.post("/api/console/commands/refresh"), "Analyse des commandes lancée");
+      await run(() => api.post("/api/console/commands/refresh"), translate("console.refreshStarted"));
       await refresh();
     },
   };

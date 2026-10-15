@@ -27,9 +27,9 @@ const (
 
 // Process errors.
 var (
-	ErrAlreadyRunning = errors.New("le serveur est déjà démarré")
-	ErrNotRunning     = errors.New("le serveur n'est pas démarré")
-	ErrInvalidCommand = errors.New("commande invalide")
+	ErrAlreadyRunning = errors.New("the server is already running")
+	ErrNotRunning     = errors.New("the server is not running")
+	ErrInvalidCommand = errors.New("invalid command")
 )
 
 const (
@@ -175,7 +175,7 @@ func (p *Process) Stop(ctx context.Context) error {
 	done, cmd := p.done, p.cmd
 	p.mu.Unlock()
 
-	p.console.System("Arrêt du serveur demandé…")
+	p.console.System("Server stop requested…")
 	_ = p.sendRaw(stopCommand)
 
 	deadline, ok := ctx.Deadline()
@@ -190,14 +190,14 @@ func (p *Process) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 
-	p.console.System("Le serveur ne répond pas, envoi de SIGTERM…")
+	p.console.System("The server does not answer, sending SIGTERM…")
 	_ = cmd.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-done:
 		return nil
 	case <-ctx.Done():
 	}
-	p.console.System("Arrêt forcé du serveur.")
+	p.console.System("Server stopped forcefully.")
 	_ = cmd.Process.Kill()
 	<-done
 	return nil
@@ -214,7 +214,7 @@ func (p *Process) Kill() error {
 	cmd, done := p.cmd, p.done
 	p.mu.Unlock()
 
-	p.console.System("Arrêt forcé du serveur (kill).")
+	p.console.System("Server killed.")
 	if err := cmd.Process.Kill(); err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (p *Process) wait(cmd *exec.Cmd, done chan struct{}, pumps *sync.WaitGroup)
 	close(done)
 	p.mu.Unlock()
 
-	p.console.System(fmt.Sprintf("Le serveur s'est arrêté (code %d).", code))
+	p.console.System(fmt.Sprintf("The server stopped (code %d).", code))
 	for _, hook := range hooks {
 		hook(info)
 	}

@@ -1,3 +1,5 @@
+import { translate, translateServer } from "./i18n";
+
 // HTTP client of the manager API. Every mutating request carries the
 // anti-CSRF header expected by the server.
 
@@ -37,7 +39,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   const isJSON = response.headers.get("Content-Type")?.includes("application/json");
   const data: unknown = isJSON ? await response.json() : null;
   if (!response.ok) {
-    const message = (data as { error?: string } | null)?.error ?? `Erreur HTTP ${response.status}`;
+    const message = (data as { error?: string } | null)?.error ?? translate("common.httpError", { status: response.status });
     throw new ApiError(response.status, message);
   }
   return data as T;
@@ -63,9 +65,9 @@ function upload<T>(url: string, file: File, onProgress?: (fraction: number) => v
       }
       if (xhr.status === 401) notifyUnauthorized(url);
       if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
-      else reject(new ApiError(xhr.status, (data as { error?: string } | null)?.error ?? `Erreur HTTP ${xhr.status}`));
+      else reject(new ApiError(xhr.status, (data as { error?: string } | null)?.error ?? translate("common.httpError", { status: xhr.status })));
     });
-    xhr.addEventListener("error", () => reject(new ApiError(0, "Erreur réseau")));
+    xhr.addEventListener("error", () => reject(new ApiError(0, translate("common.networkError"))));
     xhr.send(form);
   });
 }
@@ -82,6 +84,7 @@ export const api = {
 /** Encodes a value for use as a URL path segment. */
 export const seg = encodeURIComponent;
 
+/** Message of a failure, translated when it comes from the server. */
 export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  return translateServer(err instanceof Error ? err.message : String(err));
 }

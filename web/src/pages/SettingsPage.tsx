@@ -1,5 +1,7 @@
 import { KeyRound, LogOut, RefreshCw, Save as SaveIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { PasskeysCard } from "../components/account/PasskeysCard";
+import { LanguagePicker } from "../components/LanguagePicker";
 import { CurseForgeKey } from "../components/curseforge/CurseForgeKey";
 import { HytaleConnect } from "../components/hytale/HytaleConnect";
 import { ProfilePicker } from "../components/hytale/ProfilePicker";
@@ -13,34 +15,30 @@ import { usePolling } from "../hooks/usePolling";
 import { useStatus } from "../hooks/useStatus";
 import { api } from "../lib/api";
 import { formatDate } from "../lib/format";
+import { translate as t, useI18n, type Lang, type MessageKey } from "../lib/i18n";
 import type { AuthMode, Patchline, ServerSettings } from "../lib/types";
 
 type NumberKey = "minMemoryMb" | "maxMemoryMb" | "port" | "stopTimeoutSeconds" | "nativeBackupMinutes";
 type BoolKey = "autoStart" | "autoRestart" | "useAotCache" | "nativeBackups" | "backupBeforeRestore" | "disableSentry" | "acceptEarlyPlugins" | "autosaveEnabled" | "autoUpdate" | "sleepEnabled";
 
-const NUMBERS: { key: NumberKey; label: string; hint?: string; min: number; max: number; step?: number }[] = [
-  { key: "minMemoryMb", label: "Mémoire minimale", hint: "En Mo (-Xms)", min: 256, max: 262144, step: 256 },
-  { key: "maxMemoryMb", label: "Mémoire maximale", hint: "En Mo (-Xmx)", min: 1024, max: 262144, step: 256 },
-  { key: "port", label: "Port du jeu (UDP)", hint: "Adaptez aussi la publication Docker", min: 1, max: 65535 },
-  { key: "stopTimeoutSeconds", label: "Délai d'arrêt", hint: "Secondes avant arrêt forcé", min: 10, max: 600 },
+const NUMBERS: { key: NumberKey; label: MessageKey; hint?: MessageKey; min: number; max: number; step?: number }[] = [
+  { key: "minMemoryMb", label: "settings.server.minMemory", hint: "settings.server.minMemoryHint", min: 256, max: 262144, step: 256 },
+  { key: "maxMemoryMb", label: "settings.server.maxMemory", hint: "settings.server.maxMemoryHint", min: 1024, max: 262144, step: 256 },
+  { key: "port", label: "settings.server.port", hint: "settings.server.portHint", min: 1, max: 65535 },
+  { key: "stopTimeoutSeconds", label: "settings.server.stopTimeout", hint: "settings.server.stopTimeoutHint", min: 10, max: 600 },
 ];
 
-const BOOLEANS: { key: BoolKey; label: string; description: string }[] = [
-  { key: "autoStart", label: "Démarrage automatique", description: "Lance le serveur au démarrage du conteneur." },
-  { key: "autoRestart", label: "Redémarrage après plantage", description: "Jusqu'à 3 tentatives en 10 minutes." },
-  { key: "useAotCache", label: "Cache AOT", description: "Démarrage plus rapide grâce au cache fourni avec le serveur." },
-  { key: "backupBeforeRestore", label: "Sauvegarde avant restauration", description: "Crée une sauvegarde de sécurité avant chaque restauration." },
-  { key: "autosaveEnabled", label: "Autosave", description: "Sauvegarde périodique du monde actif pendant que le serveur tourne, en rotation." },
-  { key: "autoUpdate", label: "Mises à jour automatiques", description: "Arrête le serveur, sauvegarde le monde puis installe la mise à jour quand il est vide, ou après un compte à rebours si des joueurs restent connectés." },
-  {
-    key: "sleepEnabled",
-    label: "Mise en veille",
-    description:
-      "Arrête le serveur (monde sauvegardé) quand il est vide, puis le relance dès qu'un joueur tente de se connecter. Le premier essai de connexion peut échouer si le démarrage est long : il suffit de réessayer.",
-  },
-  { key: "nativeBackups", label: "Sauvegardes natives Hytale", description: "Sauvegardes périodiques effectuées par le serveur lui-même." },
-  { key: "disableSentry", label: "Désactiver Sentry", description: "N'envoie pas les rapports de plantage à Hypixel." },
-  { key: "acceptEarlyPlugins", label: "Early plugins", description: "Non supporté officiellement, peut causer des instabilités." },
+const BOOLEANS: { key: BoolKey; label: MessageKey; description: MessageKey }[] = [
+  { key: "autoStart", label: "settings.behaviour.autoStart", description: "settings.behaviour.autoStartHint" },
+  { key: "autoRestart", label: "settings.behaviour.autoRestart", description: "settings.behaviour.autoRestartHint" },
+  { key: "useAotCache", label: "settings.behaviour.aot", description: "settings.behaviour.aotHint" },
+  { key: "backupBeforeRestore", label: "settings.behaviour.backupBeforeRestore", description: "settings.behaviour.backupBeforeRestoreHint" },
+  { key: "autosaveEnabled", label: "settings.behaviour.autosave", description: "settings.behaviour.autosaveHint" },
+  { key: "autoUpdate", label: "settings.behaviour.autoUpdate", description: "settings.behaviour.autoUpdateHint" },
+  { key: "sleepEnabled", label: "settings.behaviour.sleep", description: "settings.behaviour.sleepHint" },
+  { key: "nativeBackups", label: "settings.behaviour.nativeBackups", description: "settings.behaviour.nativeBackupsHint" },
+  { key: "disableSentry", label: "settings.behaviour.disableSentry", description: "settings.behaviour.disableSentryHint" },
+  { key: "acceptEarlyPlugins", label: "settings.behaviour.earlyPlugins", description: "settings.behaviour.earlyPluginsHint" },
 ];
 
 function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {
@@ -48,10 +46,18 @@ function Section({ title, description, children }: { title: string; description:
     <div className="grid grid-cols-1 gap-x-10 gap-y-4 border-t border-white/[0.06] py-8 first:border-t-0 first:pt-0 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <div>
         <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
-        <p className="mt-1 text-sm text-zinc-500">{description}</p>
+        <p className="mt-1 text-sm text-zinc-400">{description}</p>
       </div>
       <div className="min-w-0">{children}</div>
     </div>
+  );
+}
+
+function NumberField({ label, hint, value, min, max, onChange, className }: { label: string; hint: string; value: number; min: number; max: number; onChange: (v: number) => void; className?: string }) {
+  return (
+    <Field label={label} hint={hint}>
+      {(id) => <Input id={id} type="number" min={min} max={max} required className={className} value={value} onChange={(e) => onChange(Number(e.target.value))} />}
+    </Field>
   );
 }
 
@@ -65,7 +71,7 @@ function ServerSettingsForm({ initial, onSaved }: { initial: ServerSettings; onS
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await run(() => api.put("/api/settings", form), "Paramètres enregistrés — appliqués au prochain démarrage");
+    await run(() => api.put("/api/settings", form), t("settings.saved"));
     await onSaved();
   };
 
@@ -73,97 +79,78 @@ function ServerSettingsForm({ initial, onSaved }: { initial: ServerSettings; onS
   const actions = (
     <div className="mt-4 flex justify-end gap-2">
       <Button variant="ghost" disabled={!dirty} onClick={() => setForm(initial)}>
-        Annuler
+        {t("settings.cancel")}
       </Button>
       <Button type="submit" variant="primary" icon={SaveIcon} disabled={!dirty}>
-        Enregistrer
+        {t("settings.save")}
       </Button>
     </div>
   );
 
   return (
     <form onSubmit={submit}>
-      <Section title="Serveur" description="Ressources et réseau. Appliqué au prochain démarrage.">
+      <Section title={t("settings.server.title")} description={t("settings.server.description")}>
         <Card>
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {NUMBERS.map((n) => (
-              <Field key={n.key} label={n.label} hint={n.hint}>
+              <Field key={n.key} label={t(n.label)} hint={n.hint && t(n.hint)}>
                 {(id) => (
                   <Input id={id} type="number" min={n.min} max={n.max} step={n.step} required value={form[n.key]} onChange={(e) => set(n.key, Number(e.target.value))} />
                 )}
               </Field>
             ))}
-            <Field label="Authentification des joueurs" hint="Offline : aucune vérification des comptes">
+            <Field label={t("settings.server.authMode")} hint={t("settings.server.authModeHint")}>
               {(id) => (
                 <Select id={id} value={form.authMode} onChange={(e) => set("authMode", e.target.value as AuthMode)}>
-                  <option value="authenticated">Comptes Hytale (recommandé)</option>
-                  <option value="offline">Offline</option>
+                  <option value="authenticated">{t("settings.server.authenticated")}</option>
+                  <option value="offline">{t("settings.server.offline")}</option>
                 </Select>
               )}
             </Field>
-            <Field label="Canal de mise à jour">
+            <Field label={t("settings.server.patchline")}>
               {(id) => (
                 <Select id={id} value={form.patchline} onChange={(e) => set("patchline", e.target.value as Patchline)}>
-                  <option value="release">Release</option>
-                  <option value="pre-release">Pre-release</option>
+                  <option value="release">{t("settings.server.release")}</option>
+                  <option value="pre-release">{t("settings.server.preRelease")}</option>
                 </Select>
               )}
             </Field>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <span className="text-sm font-medium text-zinc-200">{t("settings.server.gameLanguage")}</span>
+              <LanguagePicker label={t("settings.server.gameLanguage")} value={form.gameLanguage} onChange={(v) => set("gameLanguage", v)} />
+              <span className="text-xs text-zinc-500">{t("settings.server.gameLanguageHint")}</span>
+            </div>
           </CardBody>
         </Card>
         {actions}
       </Section>
 
-      <Section title="Comportement" description="Automatisations et options avancées.">
+      <Section title={t("settings.behaviour.title")} description={t("settings.behaviour.description")}>
         <Card>
           <CardBody className="divide-y divide-white/[0.05] py-2">
             {BOOLEANS.map((b) => (
-              <Toggle key={b.key} label={b.label} description={b.description} checked={form[b.key]} onChange={(v) => set(b.key, v)} />
+              <Toggle key={b.key} label={t(b.label)} description={t(b.description)} checked={form[b.key]} onChange={(v) => set(b.key, v)} />
             ))}
             {form.autosaveEnabled && (
               <div className="grid grid-cols-1 gap-5 py-3 sm:grid-cols-2">
-                <Field label="Fréquence de l'autosave" hint="En minutes (1-1440)">
-                  {(id) => (
-                    <Input id={id} type="number" min={1} max={1440} required value={form.autosaveMinutes} onChange={(e) => set("autosaveMinutes", Number(e.target.value))} />
-                  )}
-                </Field>
-                <Field label="Slots d'autosave" hint="Les plus anciens sont écrasés (1-100)">
-                  {(id) => (
-                    <Input id={id} type="number" min={1} max={100} required value={form.autosaveSlots} onChange={(e) => set("autosaveSlots", Number(e.target.value))} />
-                  )}
-                </Field>
+                <NumberField label={t("settings.behaviour.autosaveFrequency")} hint={t("settings.behaviour.autosaveFrequencyHint")} min={1} max={1440} value={form.autosaveMinutes} onChange={(v) => set("autosaveMinutes", v)} />
+                <NumberField label={t("settings.behaviour.autosaveSlots")} hint={t("settings.behaviour.autosaveSlotsHint")} min={1} max={100} value={form.autosaveSlots} onChange={(v) => set("autosaveSlots", v)} />
               </div>
             )}
             {form.autoUpdate && (
               <div className="grid grid-cols-1 gap-5 py-3 sm:grid-cols-2">
-                <Field label="Mise à jour si serveur vide" hint="Minutes sans joueur (1-1440)">
-                  {(id) => (
-                    <Input id={id} type="number" min={1} max={1440} required value={form.autoUpdateIdleMinutes} onChange={(e) => set("autoUpdateIdleMinutes", Number(e.target.value))} />
-                  )}
-                </Field>
-                <Field label="Mise à jour forcée" hint="Heures d'attente avant un compte à rebours de 30 min (1-720)">
-                  {(id) => (
-                    <Input id={id} type="number" min={1} max={720} required value={form.autoUpdateForceHours} onChange={(e) => set("autoUpdateForceHours", Number(e.target.value))} />
-                  )}
-                </Field>
+                <NumberField label={t("settings.behaviour.updateIdle")} hint={t("settings.behaviour.updateIdleHint")} min={1} max={1440} value={form.autoUpdateIdleMinutes} onChange={(v) => set("autoUpdateIdleMinutes", v)} />
+                <NumberField label={t("settings.behaviour.updateForce")} hint={t("settings.behaviour.updateForceHint")} min={1} max={720} value={form.autoUpdateForceHours} onChange={(v) => set("autoUpdateForceHours", v)} />
               </div>
             )}
             {form.sleepEnabled && (
               <div className="py-3">
-                <Field label="Mise en veille si serveur vide" hint="Minutes sans joueur (1-1440)">
-                  {(id) => (
-                    <Input id={id} type="number" min={1} max={1440} className="max-w-40" required value={form.sleepIdleMinutes} onChange={(e) => set("sleepIdleMinutes", Number(e.target.value))} />
-                  )}
-                </Field>
+                <NumberField label={t("settings.behaviour.sleepIdle")} hint={t("settings.behaviour.sleepIdleHint")} min={1} max={1440} className="max-w-40" value={form.sleepIdleMinutes} onChange={(v) => set("sleepIdleMinutes", v)} />
               </div>
             )}
             {form.nativeBackups && (
               <div className="py-3">
-                <Field label="Fréquence des sauvegardes natives" hint="En minutes">
-                  {(id) => (
-                    <Input id={id} type="number" min={5} max={1440} className="max-w-40" value={form.nativeBackupMinutes} onChange={(e) => set("nativeBackupMinutes", Number(e.target.value))} />
-                  )}
-                </Field>
+                <NumberField label={t("settings.behaviour.nativeBackupFrequency")} hint={t("settings.behaviour.nativeBackupFrequencyHint")} min={5} max={1440} className="max-w-40" value={form.nativeBackupMinutes} onChange={(v) => set("nativeBackupMinutes", v)} />
               </div>
             )}
           </CardBody>
@@ -184,13 +171,13 @@ function HytaleSection() {
 
   const logout = async () => {
     const ok = await confirm({
-      title: "Déconnecter le compte Hytale ?",
-      message: "Le serveur ne pourra plus démarrer en mode authentifié ni se mettre à jour.",
-      confirmLabel: "Déconnecter",
+      title: t("settings.account.logoutTitle"),
+      message: t("settings.account.logoutMessage"),
+      confirmLabel: t("settings.account.logout"),
       danger: true,
     });
     if (!ok) return;
-    await run(() => api.post("/api/hytale/auth/logout"), "Compte déconnecté");
+    await run(() => api.post("/api/hytale/auth/logout"), t("settings.account.loggedOut"));
     await refresh();
   };
 
@@ -198,8 +185,8 @@ function HytaleSection() {
     const running = server.state === "running";
     const ok =
       !running ||
-      (await confirm({ title: "Mettre à jour maintenant ?", message: "Le serveur sera arrêté puis redémarré automatiquement.", confirmLabel: "Mettre à jour" }));
-    if (ok) await run(() => api.post("/api/setup/update"), "Mise à jour lancée");
+      (await confirm({ title: t("settings.updates.nowTitle"), message: t("settings.updates.nowMessage"), confirmLabel: t("settings.updates.update") }));
+    if (ok) await run(() => api.post("/api/setup/update"), t("settings.updates.started"));
     await refresh();
   };
 
@@ -210,20 +197,20 @@ function HytaleSection() {
     const ok =
       server.state !== "running" ||
       (await confirm({
-        title: choice === "" ? "Suivre la dernière version ?" : `Passer à la version ${choice} ?`,
-        message: `Le serveur sera arrêté puis redémarré automatiquement.${rollback ? " Attention : un monde sauvegardé avec une version plus récente peut ne pas s'ouvrir avec une version plus ancienne." : ""}`,
-        confirmLabel: "Appliquer",
+        title: choice === "" ? t("settings.updates.followTitle") : t("settings.updates.switchTitle", { version: choice }),
+        message: t("settings.updates.nowMessage") + (rollback ? t("settings.updates.rollbackWarning") : ""),
+        confirmLabel: t("settings.updates.apply"),
         danger: rollback,
       }));
     if (!ok) return;
-    await run(() => api.post("/api/setup/version", { version: choice }), "Version appliquée");
+    await run(() => api.post("/api/setup/version", { version: choice }), t("settings.updates.applied"));
     setWanted(null);
     await refresh();
   };
 
   return (
     <>
-      <Section title="Compte Hytale" description="Utilisé pour authentifier le serveur et télécharger ses mises à jour.">
+      <Section title={t("settings.account.title")} description={t("settings.account.description")}>
         <Card>
           <CardBody className="flex flex-col gap-5">
             {hytale.authenticated ? (
@@ -234,12 +221,12 @@ function HytaleSection() {
                       {(hytale.profileName ?? "?").slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-zinc-100">{hytale.profileName ?? "Profil non sélectionné"}</p>
-                      <p className="text-xs text-zinc-500">Jetons renouvelés le {formatDate(hytale.refreshedAt)}</p>
+                      <p className="text-sm font-medium text-zinc-100">{hytale.profileName ?? t("settings.account.noProfile")}</p>
+                      <p className="text-xs text-zinc-500">{t("settings.account.tokensRefreshed", { date: formatDate(hytale.refreshedAt) })}</p>
                     </div>
                   </div>
                   <Button variant="danger" icon={LogOut} onClick={logout}>
-                    Déconnecter
+                    {t("settings.account.logout")}
                   </Button>
                 </div>
                 <div className="border-t border-white/[0.06] pt-5">
@@ -248,7 +235,7 @@ function HytaleSection() {
               </>
             ) : (
               <div className="flex flex-col items-start gap-3">
-                <p className="text-sm text-zinc-400">Aucun compte connecté.</p>
+                <p className="text-sm text-zinc-400">{t("settings.account.none")}</p>
                 <HytaleConnect align="start" />
               </div>
             )}
@@ -256,59 +243,86 @@ function HytaleSection() {
         </Card>
       </Section>
 
-      <Section title="Mises à jour" description="Vérifiées toutes les heures et installées automatiquement quand le serveur est arrêté.">
+      <Section title={t("settings.updates.title")} description={t("settings.updates.description")}>
         <Card>
           <CardBody className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-zinc-400">Version installée</span>
+                <span className="text-zinc-400">{t("settings.updates.installed")}</span>
                 <span className="font-medium text-zinc-100">{setup.gameVersion ?? "—"}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-zinc-400">Dernière version</span>
+                <span className="text-zinc-400">{t("settings.updates.latest")}</span>
                 <span className="font-medium text-zinc-100">{setup.latestVersion ?? "—"}</span>
                 {setup.updateAvailable ? (
-                  <Badge tone="info">Disponible</Badge>
+                  <Badge tone="info">{t("settings.updates.available")}</Badge>
                 ) : (
-                  setup.latestVersion && <Badge tone="success">À jour</Badge>
+                  setup.latestVersion && <Badge tone="success">{t("settings.updates.upToDate")}</Badge>
                 )}
               </div>
             </div>
             <Button icon={RefreshCw} disabled={!setup.updateAvailable || setup.activity !== "idle"} onClick={update}>
-              Mettre à jour maintenant
+              {t("settings.updates.updateNow")}
             </Button>
           </CardBody>
           <CardBody className="flex flex-wrap items-end justify-between gap-4 border-t border-white/[0.06]">
             <Field
-              label="Version du jeu"
-              hint={
-                setup.pinnedVersion
-                  ? `Figée sur ${setup.pinnedVersion} : aucune mise à jour automatique.`
-                  : "Les versions remplacées sont conservées pour un retour en arrière."
-              }
+              label={t("settings.updates.version")}
+              hint={setup.pinnedVersion ? t("settings.updates.pinned", { version: setup.pinnedVersion }) : t("settings.updates.keptVersions")}
             >
               {(id) => (
                 <Select id={id} value={choice} onChange={(e) => setWanted(e.target.value)}>
-                  <option value="">Toujours la dernière (automatique)</option>
+                  <option value="">{t("settings.updates.followLatest")}</option>
                   {versions.map((v) => (
                     <option key={v} value={v}>
                       {v}
-                      {v === setup.gameVersion ? " (installée)" : setup.storedVersions.includes(v) ? " (stockée)" : " (dernière)"}
+                      {v === setup.gameVersion
+                        ? t("settings.updates.installedSuffix")
+                        : setup.storedVersions.includes(v)
+                          ? t("settings.updates.storedSuffix")
+                          : t("settings.updates.latestSuffix")}
                     </option>
                   ))}
                 </Select>
               )}
             </Field>
-            <Button
-              disabled={choice === setup.pinnedVersion || setup.activity !== "idle"}
-              onClick={changeVersion}
-            >
-              Appliquer
+            <Button disabled={choice === setup.pinnedVersion || setup.activity !== "idle"} onClick={changeVersion}>
+              {t("settings.updates.apply")}
             </Button>
           </CardBody>
         </Card>
       </Section>
     </>
+  );
+}
+
+function InterfaceSection() {
+  const { lang, setLang } = useI18n();
+  const { notify } = useFeedback();
+  const [draft, setDraft] = useState<Lang>(lang);
+
+  // The interface switches language when the choice is saved.
+  const save = () => {
+    setLang(draft);
+    notify("success", t("settings.interface.saved"));
+  };
+
+  return (
+    <Section title={t("settings.interface.title")} description={t("settings.interface.description")}>
+      <Card>
+        <CardBody className="flex flex-wrap items-center justify-between gap-4">
+          <LanguagePicker label={t("common.language")} value={draft} onChange={setDraft} />
+          <div className="flex gap-2">
+            <Button variant="ghost" disabled={draft === lang} onClick={() => setDraft(lang)}>
+              {t("settings.cancel")}
+            </Button>
+            <Button variant="primary" icon={SaveIcon} disabled={draft === lang} onClick={save}>
+              {t("settings.save")}
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+    </Section>
   );
 }
 
@@ -321,10 +335,10 @@ function PasswordSection() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (next !== confirmation) {
-      notify("error", "Les deux nouveaux mots de passe diffèrent.");
+      notify("error", t("settings.password.mismatch"));
       return;
     }
-    const ok = await run(() => api.post("/api/account/password", { current, next }).then(() => true), "Mot de passe changé, les autres sessions ont été déconnectées");
+    const ok = await run(() => api.post("/api/account/password", { current, next }).then(() => true), t("settings.password.changed"));
     if (ok) {
       setCurrent("");
       setNext("");
@@ -333,23 +347,23 @@ function PasswordSection() {
   };
 
   return (
-    <Section title="Sécurité" description="Mot de passe de ce panneau (12 caractères minimum).">
+    <Section title={t("settings.password.title")} description={t("settings.password.description")}>
       <Card>
         <form onSubmit={submit}>
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <Field label="Mot de passe actuel">
+            <Field label={t("settings.password.current")}>
               {(id) => <Input id={id} type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />}
             </Field>
-            <Field label="Nouveau mot de passe">
+            <Field label={t("settings.password.next")}>
               {(id) => <Input id={id} type="password" autoComplete="new-password" minLength={12} required value={next} onChange={(e) => setNext(e.target.value)} />}
             </Field>
-            <Field label="Confirmation">
+            <Field label={t("settings.password.confirmation")}>
               {(id) => <Input id={id} type="password" autoComplete="new-password" minLength={12} required value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />}
             </Field>
           </CardBody>
           <div className="flex justify-end border-t border-white/[0.06] px-5 py-4">
             <Button type="submit" variant="primary" icon={KeyRound}>
-              Changer le mot de passe
+              {t("settings.password.change")}
             </Button>
           </div>
         </form>
@@ -362,12 +376,16 @@ export function SettingsPage() {
   const { data, refresh } = usePolling(() => api.get<ServerSettings>("/api/settings"), 0);
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Paramètres" description="Configuration du serveur, du compte Hytale et du panneau." />
+      <PageHeader title={t("settings.title")} description={t("settings.description")} />
       <div>
         {data && <ServerSettingsForm initial={data} onSaved={refresh} />}
         <HytaleSection />
-        <Section title="CurseForge" description="Recherche, installation et mise à jour des mods et modpacks depuis CurseForge.">
+        <InterfaceSection />
+        <Section title={t("settings.curseforge.title")} description={t("settings.curseforge.description")}>
           <CurseForgeKey />
+        </Section>
+        <Section title={t("settings.passkeys.title")} description={t("settings.passkeys.description")}>
+          <PasskeysCard />
         </Section>
         <PasswordSection />
       </div>

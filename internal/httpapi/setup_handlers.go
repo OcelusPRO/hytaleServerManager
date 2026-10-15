@@ -40,7 +40,7 @@ func (a *api) setupVersion(w http.ResponseWriter, r *http.Request) {
 	known := body.Version == "" || body.Version == st.GameVersion ||
 		body.Version == st.LatestVersion || slices.Contains(st.StoredVersions, body.Version)
 	if !known {
-		writeError(w, a.log, errBadRequest("version inconnue : choisissez la version installée, une version stockée ou la dernière"))
+		writeError(w, a.log, errBadRequest("unknown version: choose the installed version, a stored version or the latest"))
 		return
 	}
 	needsSwitch := body.Version != st.GameVersion
@@ -71,7 +71,7 @@ func (a *api) applyGameBuild() error {
 	if wasRunning {
 		after = func() {
 			if err := a.deps.Controller.Start(context.Background()); err != nil {
-				a.deps.Console.System("Redémarrage après changement de version impossible : " + err.Error())
+				a.deps.Console.System("Could not restart after the version change: " + err.Error())
 			}
 		}
 	}

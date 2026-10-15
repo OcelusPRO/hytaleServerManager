@@ -14,9 +14,9 @@ import (
 
 // Validation errors.
 var (
-	ErrNotFound    = errors.New("élément introuvable")
-	ErrInvalidID   = errors.New("identifiant invalide")
-	ErrInvalidName = errors.New("nom invalide (1 à 64 caractères imprimables)")
+	ErrNotFound    = errors.New("item not found")
+	ErrInvalidID   = errors.New("invalid identifier")
+	ErrInvalidName = errors.New("invalid name (1 to 64 printable characters)")
 )
 
 var idPattern = regexp.MustCompile(`^[a-f0-9]{12}$`)

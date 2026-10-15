@@ -1,3 +1,4 @@
+import { translate } from "./i18n";
 // Console autocompletion: pure functions turning the typed text and the
 // server's command catalog into suggestions and an argument hint.
 
@@ -222,7 +223,7 @@ function argumentSuggestions(
         key: `${isPlayer ? "player" : "value"}:${v}`,
         value: `${before}${quote(v)} `,
         label: v,
-        detail: isPlayer ? "joueur connecté" : arg.name,
+        detail: isPlayer ? translate("console.completion.onlinePlayer") : arg.name,
         kind: isPlayer ? "player" : "value",
       });
     }
@@ -233,13 +234,13 @@ function argumentSuggestions(
         value: `${before}""`,
         caret: before.length + 1,
         label: '""',
-        detail: "texte entre guillemets",
-        description: "Pour un texte contenant des espaces",
+        detail: translate("console.completion.quotedText"),
+        description: translate("console.completion.quotedTextHint"),
         kind: "snippet",
       });
     }
     if (arg.default && writable(arg.default) && !arg.values?.length && typedValue === "" && !inQuotes) {
-      add({ key: `default:${arg.name}`, value: `${before}${quote(arg.default)} `, label: quote(arg.default), detail: "valeur par défaut", kind: "value" });
+      add({ key: `default:${arg.name}`, value: `${before}${quote(arg.default)} `, label: quote(arg.default), detail: translate("console.completion.defaultHint"), kind: "value" });
     }
   };
 
@@ -268,7 +269,7 @@ function argumentSuggestions(
           key: `flag:${f.name}`,
           value: `${prefix}${f.name} `,
           label: f.name,
-          detail: f.takesValue ? `<${f.type?.toLowerCase() || "valeur"}>` : undefined,
+          detail: f.takesValue ? `<${f.type?.toLowerCase() || translate("console.completion.value")}>` : undefined,
           description: f.description,
           kind: "flag",
         });

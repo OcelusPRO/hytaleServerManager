@@ -149,7 +149,7 @@ func (a *api) listCurseForgeJobs(w http.ResponseWriter, _ *http.Request) {
 func (a *api) getCurseForgeJob(w http.ResponseWriter, r *http.Request) {
 	job, ok := a.deps.CurseForge.Job(r.PathValue("jobId"))
 	if !ok {
-		writeMessage(w, http.StatusNotFound, "opération introuvable")
+		writeMessage(w, http.StatusNotFound, "operation not found")
 		return
 	}
 	writeJSON(w, http.StatusOK, job)
@@ -158,7 +158,7 @@ func (a *api) getCurseForgeJob(w http.ResponseWriter, r *http.Request) {
 func (a *api) intPath(w http.ResponseWriter, r *http.Request, name string) (int, bool) {
 	n, err := strconv.Atoi(r.PathValue(name))
 	if err != nil || n <= 0 {
-		writeError(w, a.log, errBadRequest("identifiant invalide"))
+		writeError(w, a.log, errBadRequest("invalid identifier"))
 		return 0, false
 	}
 	return n, true

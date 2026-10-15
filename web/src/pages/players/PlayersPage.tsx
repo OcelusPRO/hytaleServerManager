@@ -12,6 +12,7 @@ import { BanDetailsDialog } from "./BanDetailsDialog";
 import { OnlinePlayersCard } from "./OnlinePlayersCard";
 import { displayName, PlayerIdentity } from "./PlayerIdentity";
 import { usePlayers } from "./usePlayers";
+import { translate as t } from "../../lib/i18n";
 
 /** Name when known (commands prefer it), UUID otherwise. */
 const target = (p: PlayerRef) => p.name || p.uuid;
@@ -27,63 +28,63 @@ export function PlayersPage() {
   const ban = async (player: OnlinePlayer | PlayerRef | string) => {
     const name = typeof player === "string" ? player : target(player);
     const reason = await prompt({
-      title: `Bannir ${name} ?`,
-      label: "Raison du bannissement",
-      placeholder: "Optionnelle",
+      title: t("players.ban.title", { name }),
+      label: t("players.ban.reason"),
+      placeholder: t("players.ban.optional"),
       maxLength: 200,
-      confirmLabel: "Bannir",
+      confirmLabel: t("players.ban.confirm"),
       optional: true,
     });
     if (reason === null) return false;
-    return act("ban", name, `${name} a été banni`, reason);
+    return act("ban", name, t("players.ban.done", { name }), reason);
   };
 
   const kick = async (p: OnlinePlayer) => {
-    if (await confirm({ title: `Expulser ${p.name} ?`, confirmLabel: "Expulser" })) await act("kick", p.name, `${p.name} a été expulsé`);
+    if (await confirm({ title: t("players.kick.title", { name: p.name }), confirmLabel: t("players.kick.confirm") })) await act("kick", p.name, t("players.kick.done", { name: p.name }));
   };
 
-  const unban = (b: BanEntry) => remove("bans", b.player.uuid, `${displayName(b.player)} a été débanni`);
+  const unban = (b: BanEntry) => remove("bans", b.player.uuid, t("players.ban.unbanned", { name: displayName(b.player) }));
 
   const deop = async (p: PlayerRef) => {
-    const ok = await confirm({ title: `Retirer ${displayName(p)} des opérateurs ?`, confirmLabel: "Retirer", danger: true });
-    if (ok) await remove("operators", p.uuid, `${displayName(p)} n'est plus opérateur`);
+    const ok = await confirm({ title: t("players.op.deopTitle", { name: displayName(p) }), confirmLabel: t("players.op.remove"), danger: true });
+    if (ok) await remove("operators", p.uuid, t("players.op.deopped", { name: displayName(p) }));
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Joueurs" description="Joueurs connectés, whitelist, bannissements et opérateurs du monde actif." />
+      <PageHeader title={t("players.title")} description={t("players.description")} />
 
       {!live && (
         <Alert tone="info">
-          Le serveur est arrêté : vous pouvez retirer des joueurs des listes, mais les ajouts nécessitent que le serveur soit en ligne.
+          {t("players.stoppedHint")}
         </Alert>
       )}
 
       <OnlinePlayersCard
         data={data}
-        onOp={(p) => void act("op", p.name, `${p.name} est maintenant opérateur`)}
+        onOp={(p) => void act("op", p.name, t("players.op.done", { name: p.name }))}
         onKick={(p) => void kick(p)}
         onBan={(p) => void ban(p)}
       />
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
         <AccessListCard
-          title="Whitelist"
-          description={data.whitelist.enabled ? "Seuls ces joueurs peuvent rejoindre." : "Désactivée : tout le monde peut rejoindre."}
+          title={t("players.whitelist.title")}
+          description={data.whitelist.enabled ? t("players.whitelist.enabledHint") : t("players.whitelist.disabledHint")}
           icon={ListChecks}
           headerAction={
             <Switch
-              label="Activer la whitelist"
+              label={t("players.whitelist.toggle")}
               checked={data.whitelist.enabled}
               onChange={(enabled) => void setWhitelist(enabled)}
             />
           }
           items={data.whitelist.players}
           itemKey={(p) => p.uuid}
-          emptyText="Aucun joueur dans la whitelist."
-          addLabel="Ajouter à la whitelist"
+          emptyText={t("players.whitelist.empty")}
+          addLabel={t("players.whitelist.add")}
           canAdd={live}
-          onAdd={(name) => act("whitelist-add", name, `${name} ajouté à la whitelist`)}
+          onAdd={(name) => act("whitelist-add", name, t("players.whitelist.added", { name }))}
           renderItem={(p) => (
             <>
               <PlayerIdentity player={p} />
@@ -91,52 +92,52 @@ export function PlayersPage() {
                 size="sm"
                 variant="ghost"
                 icon={UserMinus}
-                onClick={() => remove("whitelist", p.uuid, `${displayName(p)} retiré de la whitelist`)}
+                onClick={() => remove("whitelist", p.uuid, t("players.whitelist.removed", { name: displayName(p) }))}
               >
-                Retirer
+                {t("players.whitelist.remove")}
               </Button>
             </>
           )}
         />
 
         <AccessListCard
-          title="Bannissements"
-          description="Joueurs interdits de connexion."
+          title={t("players.bans.title")}
+          description={t("players.bans.description")}
           icon={Gavel}
           items={data.bans}
           itemKey={(b) => b.player.uuid}
-          emptyText="Aucun joueur banni."
-          addLabel="Bannir un joueur"
+          emptyText={t("players.bans.empty")}
+          addLabel={t("players.bans.add")}
           canAdd={live}
           onAdd={(name) => ban(name)}
           renderItem={(b) => (
             <>
-              <PlayerIdentity player={b.player} detail={b.reason || (b.timestamp ? `Banni le ${formatDate(b.timestamp)}` : "Aucune raison")} />
+              <PlayerIdentity player={b.player} detail={b.reason || (b.timestamp ? t("players.bans.bannedOn", { date: formatDate(b.timestamp) }) : t("players.bans.noReason"))} />
               <div className="flex shrink-0 items-center gap-1">
                 <Button size="sm" variant="ghost" icon={Eye} onClick={() => setBanShown(b)}>
-                  Voir
+                  {t("players.bans.view")}
                 </Button>
-                <Button size="sm" variant="ghost" icon={ShieldOff} onClick={() => unban(b)} aria-label={`Débannir ${displayName(b.player)}`} title="Débannir" />
+                <Button size="sm" variant="ghost" icon={ShieldOff} onClick={() => unban(b)} aria-label={t("players.bans.unbanPlayer", { name: displayName(b.player) })} title={t("players.bans.unban")} />
               </div>
             </>
           )}
         />
 
         <AccessListCard
-          title="Opérateurs"
-          description="Accès à toutes les commandes du serveur."
+          title={t("players.operators.title")}
+          description={t("players.operators.description")}
           icon={ShieldCheck}
           items={data.operators}
           itemKey={(p) => p.uuid}
-          emptyText="Aucun opérateur."
-          addLabel="Promouvoir opérateur"
+          emptyText={t("players.operators.empty")}
+          addLabel={t("players.operators.add")}
           canAdd={live}
-          onAdd={(name) => act("op", name, `${name} est maintenant opérateur`)}
+          onAdd={(name) => act("op", name, t("players.op.done", { name }))}
           renderItem={(p) => (
             <>
               <PlayerIdentity player={p} />
               <Button size="sm" variant="ghost" icon={UserMinus} onClick={() => deop(p)}>
-                Retirer
+                {t("players.operators.remove")}
               </Button>
             </>
           )}

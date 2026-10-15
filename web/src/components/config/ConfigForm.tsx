@@ -4,6 +4,7 @@ import { fieldMeta, humanize, isObject, type FieldMeta } from "../../lib/configS
 import type { ConfigKind, JsonObject, JsonValue } from "../../lib/types";
 import { Button } from "../ui/Button";
 import { Input, Select, Switch } from "../ui/Field";
+import { translate as t } from "../../lib/i18n";
 
 interface FormProps {
   kind: ConfigKind;
@@ -102,7 +103,7 @@ function Control({ id, value, meta, disabled, onChange }: ControlProps) {
         type={meta.password ? "password" : "text"}
         autoComplete="off"
         value={value ?? ""}
-        placeholder={value === null ? "(non défini)" : undefined}
+        placeholder={value === null ? t("shell.config.unset") : undefined}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -136,7 +137,7 @@ function NumberControl({ id, value, meta, disabled, onChange }: ControlProps & {
       step={meta.step ?? (Number.isInteger(value) ? 1 : "any")}
       value={text}
       disabled={disabled || unsafe}
-      title={unsafe ? "Nombre trop grand pour être modifié ici" : undefined}
+      title={unsafe ? t("shell.config.tooLarge") : undefined}
       onChange={(e) => {
         setText(e.target.value);
         const n = e.target.valueAsNumber;
@@ -151,13 +152,13 @@ function StringList({ id, items, disabled, onChange }: { id: string; items: stri
     <div id={id} className="flex flex-col gap-2">
       {items.map((item, i) => (
         <div key={i} className="flex gap-2">
-          <Input value={item} disabled={disabled} aria-label={`Élément ${i + 1}`} onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))} />
-          <Button variant="ghost" icon={X} disabled={disabled} aria-label={`Retirer l'élément ${i + 1}`} onClick={() => onChange(items.filter((_, j) => j !== i))} />
+          <Input value={item} disabled={disabled} aria-label={t("shell.config.item", { n: i + 1 })} onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))} />
+          <Button variant="ghost" icon={X} disabled={disabled} aria-label={t("shell.config.removeItem", { n: i + 1 })} onClick={() => onChange(items.filter((_, j) => j !== i))} />
         </div>
       ))}
       <div>
         <Button size="sm" icon={Plus} disabled={disabled} onClick={() => onChange([...items, ""])}>
-          Ajouter
+          {t("shell.config.add")}
         </Button>
       </div>
     </div>
@@ -187,7 +188,7 @@ function RawJson({ id, value, disabled, onChange }: { id: string; value: JsonVal
         }}
         className="w-full rounded-lg bg-zinc-950/60 px-3 py-2 font-mono text-xs text-zinc-100 ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-2 focus:ring-brand-500/70 disabled:opacity-50"
       />
-      {invalid && <p className="text-xs text-red-400">JSON invalide : cette valeur ne sera pas enregistrée.</p>}
+      {invalid && <p className="text-xs text-red-400">{t("shell.config.invalidJson")}</p>}
     </div>
   );
 }

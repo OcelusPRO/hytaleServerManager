@@ -110,7 +110,7 @@ func (p *progressWriter) Write(b []byte) (int, error) {
 func redact(raw string) string {
 	u, err := nurl.Parse(raw)
 	if err != nil {
-		return "URL invalide"
+		return "invalid URL"
 	}
 	u.RawQuery = ""
 	return u.String()

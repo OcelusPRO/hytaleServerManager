@@ -11,6 +11,7 @@ import { Table, Td, Th, Tr } from "../../components/ui/Table";
 import { api, seg } from "../../lib/api";
 import { formatBytes, formatDate } from "../../lib/format";
 import type { CurseForgeJob, CurseForgeUpdate, Mod } from "../../lib/types";
+import { translate as t, translatePlural as tp } from "../../lib/i18n";
 
 interface ModsPanelProps {
   saveId: string;
@@ -55,44 +56,44 @@ export function ModsPanel({ saveId, mods, inUse, onChange, onJob, jobVersion }: 
   };
 
   const remove = async (mod: Mod) => {
-    const ok = await confirm({ title: `Supprimer ${mod.fileName} ?`, confirmLabel: "Supprimer", danger: true });
+    const ok = await confirm({ title: t("worlds.mods.deleteTitle", { name: mod.fileName }), confirmLabel: t("worlds.mods.delete"), danger: true });
     if (!ok) return;
-    await run(() => api.del(`${base}/${seg(mod.fileName)}`), "Mod supprimé");
+    await run(() => api.del(`${base}/${seg(mod.fileName)}`), t("worlds.mods.deleted"));
     await onChange();
   };
 
   const upload = async (file: File, onProgress: (f: number) => void) => {
-    await run(() => api.upload(base, file, onProgress), `${file.name} ajouté`);
+    await run(() => api.upload(base, file, onProgress), t("worlds.mods.added", { name: file.name }));
     await onChange();
   };
 
   return (
     <div className="flex flex-col gap-4 p-5">
-      {inUse && <Alert tone="info">Le serveur utilise ce monde : les changements de mods s'appliqueront au prochain redémarrage.</Alert>}
+      {inUse && <Alert tone="info">{t("worlds.mods.inUse")}</Alert>}
       {updates.size > 0 && (
         <Alert
           tone="info"
-          title={`${updates.size} mise${updates.size > 1 ? "s" : ""} à jour disponible${updates.size > 1 ? "s" : ""}`}
+          title={tp("worlds.mods.updates", updates.size)}
           action={
             <Button size="sm" variant="primary" icon={ArrowUpCircle} onClick={() => update([])}>
-              Tout mettre à jour
+              {t("worlds.mods.updateAll")}
             </Button>
           }
         />
       )}
-      <FileDrop accept=".jar,.zip" multiple title="Ajouter des mods" hint="Glissez vos fichiers .jar ou .zip ici, ou cliquez pour parcourir" onFile={upload} />
+      <FileDrop accept=".jar,.zip" multiple title={t("worlds.mods.add")} hint={t("worlds.mods.addHint")} onFile={upload} />
       {mods && mods.length === 0 && (
-        <EmptyState icon={Puzzle} title="Aucun mod" description="Les mods ajoutés ici ne s'appliquent qu'à ce monde." />
+        <EmptyState icon={Puzzle} title={t("worlds.mods.empty")} description={t("worlds.mods.emptyHint")} />
       )}
       {mods && mods.length > 0 && (
         <div className="-mx-5 -mb-5 border-t border-white/[0.06]">
           <Table>
             <thead>
               <tr>
-                <Th className="w-12">Actif</Th>
-                <Th>Fichier</Th>
-                <Th className="w-28 text-right">Taille</Th>
-                <Th className="w-44 max-md:hidden">Ajouté le</Th>
+                <Th className="w-12">{t("worlds.mods.enabled")}</Th>
+                <Th>{t("worlds.mods.file")}</Th>
+                <Th className="w-28 text-right">{t("worlds.mods.size")}</Th>
+                <Th className="w-44 max-md:hidden">{t("worlds.mods.added_on")}</Th>
                 <Th className="w-40" />
               </tr>
             </thead>
@@ -100,13 +101,13 @@ export function ModsPanel({ saveId, mods, inUse, onChange, onJob, jobVersion }: 
               {mods.map((mod) => (
                 <Tr key={mod.fileName}>
                   <Td>
-                    <Checkbox checked={mod.enabled} onChange={(v) => toggle(mod, v)} label={`Activer ${mod.fileName}`} />
+                    <Checkbox checked={mod.enabled} onChange={(v) => toggle(mod, v)} label={t("worlds.mods.enable", { name: mod.fileName })} />
                   </Td>
                   <Td>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={mod.enabled ? "font-medium text-zinc-100" : "text-zinc-500 line-through"}>{mod.fileName}</span>
                       {mod.curseforge && (
-                        <span title={mod.curseforge.pack ? `Modpack : ${mod.curseforge.pack}` : undefined}>
+                        <span title={mod.curseforge.pack ? t("worlds.mods.modpack", { name: mod.curseforge.pack }) : undefined}>
                           <Badge tone="brand" className="h-5">
                             CurseForge
                           </Badge>
@@ -118,11 +119,11 @@ export function ModsPanel({ saveId, mods, inUse, onChange, onJob, jobVersion }: 
                   <Td className="text-zinc-400 max-md:hidden">{formatDate(mod.modifiedAt)}</Td>
                   <Td className="text-right whitespace-nowrap">
                     {updates.has(mod.fileName) && (
-                      <Button size="sm" icon={ArrowUpCircle} onClick={() => update([mod.fileName])} title={`Passer à ${updates.get(mod.fileName)?.latest.displayName}`}>
-                        Mettre à jour
+                      <Button size="sm" icon={ArrowUpCircle} onClick={() => update([mod.fileName])} title={t("worlds.mods.updateTo", { version: updates.get(mod.fileName)?.latest.displayName ?? "" })}>
+                        {t("worlds.mods.update")}
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" icon={Trash2} onClick={() => remove(mod)} aria-label={`Supprimer ${mod.fileName}`} />
+                    <Button size="sm" variant="ghost" icon={Trash2} onClick={() => remove(mod)} aria-label={t("worlds.mods.deleteMod", { name: mod.fileName })} />
                   </Td>
                 </Tr>
               ))}

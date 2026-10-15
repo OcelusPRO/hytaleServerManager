@@ -181,7 +181,7 @@ func (s *Sleeper) Cancel() bool {
 	}
 	s.mu.Unlock()
 	if was {
-		s.log("Veille annulée : le serveur reste arrêté.")
+		s.log("Sleep cancelled: the server stays stopped.")
 	}
 	return was
 }
@@ -192,7 +192,7 @@ func (s *Sleeper) ObserveLine(line string) {
 	case strings.Contains(line, lineBooted):
 		s.mu.Lock()
 		s.watchBind = false
-		s.openGateLocked("Serveur prêt : il traite maintenant les connexions en attente.")
+		s.openGateLocked("Server ready: it now handles the waiting connections.")
 		s.mu.Unlock()
 	case strings.Contains(line, lineBindFailed):
 		s.mu.Lock()
@@ -205,10 +205,10 @@ func (s *Sleeper) ObserveLine(line string) {
 		}
 		s.mu.Unlock()
 		if failed && s.d.Restart != nil {
-			s.log("Le serveur n'a pas pu prendre le port pendant le réveil : redémarrage sans maintien du port.")
+			s.log("The server could not take the port while waking up: restarting without holding the port.")
 			go func() {
 				if err := s.d.Restart(context.Background()); err != nil {
-					s.log("Redémarrage impossible : " + err.Error())
+					s.log("Restart failed: " + err.Error())
 				}
 			}()
 		}
@@ -249,7 +249,7 @@ func (s *Sleeper) startHook() func() {
 	}
 	ln, err := listenHook(s.d.HookSocket)
 	if err != nil {
-		s.log("Interception du bind indisponible (" + err.Error() + ") : le port sera libéré dès le démarrage.")
+		s.log(fmt.Sprintf("Bind interception unavailable (%s): the port will be released as soon as the server starts.", err))
 		return nil
 	}
 	s.mu.Lock()
@@ -265,7 +265,7 @@ func (s *Sleeper) tick() {
 	if !cfg.Enabled {
 		s.idleSince = time.Time{}
 		if s.Cancel() {
-			s.log("Mise en veille désactivée.")
+			s.log("Sleep mode disabled.")
 		}
 		return
 	}
@@ -296,7 +296,7 @@ func (s *Sleeper) checkHandoff() {
 	if s.gate != nil {
 		switch {
 		case s.d.Now().Sub(s.gateAt) >= maxGate:
-			s.openGateLocked(fmt.Sprintf("Fin du démarrage non détectée après %s : connexions en attente libérées.", maxGate))
+			s.openGateLocked(fmt.Sprintf("End of boot not detected after %s: waiting connections released.", maxGate))
 		case !s.d.Running():
 			s.openGateLocked("")
 		}
@@ -308,18 +308,18 @@ func (s *Sleeper) checkHandoff() {
 	switch {
 	case held >= maxHandoff:
 		s.handoff = false
-		s.closeLocked(fmt.Sprintf("Le serveur n'a pas pris le port après %s : port libéré.", maxHandoff))
+		s.closeLocked(fmt.Sprintf("The server did not take the port after %s: port released.", maxHandoff))
 	case held >= handoffStartGrace && !s.d.Running():
 		s.handoff, s.watchBind = false, false
-		s.closeLocked("Le serveur s'est arrêté pendant le réveil : port libéré.")
+		s.closeLocked("The server stopped while waking up: port released.")
 	}
 }
 
 // fallAsleep stops the empty server and starts listening in its place.
 func (s *Sleeper) fallAsleep(cfg Config) {
-	s.log(fmt.Sprintf("Aucun joueur depuis %s : mise en veille du serveur…", cfg.IdleAfter))
+	s.log(fmt.Sprintf("No player for %s: putting the server to sleep…", cfg.IdleAfter))
 	if err := s.d.Stop(); err != nil {
-		s.log("Mise en veille impossible : " + err.Error())
+		s.log("Could not put the server to sleep: " + err.Error())
 		return
 	}
 	s.mu.Lock()
@@ -327,7 +327,7 @@ func (s *Sleeper) fallAsleep(cfg Config) {
 	s.listenAt = time.Time{}
 	s.mu.Unlock()
 	if s.ensureListening(cfg.Port) {
-		s.log(fmt.Sprintf("Serveur en veille : il redémarrera à la prochaine connexion (port UDP %d).", cfg.Port))
+		s.log(fmt.Sprintf("Server asleep: it will start again on the next connection (UDP port %d).", cfg.Port))
 	}
 }
 
@@ -354,7 +354,7 @@ func (s *Sleeper) ensureListening(port int) bool {
 	conn, err := s.d.Listen(network, port)
 	if err != nil {
 		s.listenAt = s.d.Now().Add(retryDelay)
-		s.log(fmt.Sprintf("Écoute du port UDP %d impossible (%s), nouvel essai dans %s.", port, err, retryDelay))
+		s.log(fmt.Sprintf("Could not listen on UDP port %d (%s), retrying in %s.", port, err, retryDelay))
 		return false
 	}
 	s.conn, s.connPort = conn, port
@@ -421,9 +421,9 @@ func (s *Sleeper) wakeUp(ctx context.Context, ev wakeEvent) {
 		return // woken up or cancelled meanwhile, a retransmission, or stale
 	}
 
-	s.log(fmt.Sprintf("Connexion entrante (%s) : réveil du serveur…", ev.from))
+	s.log(fmt.Sprintf("Incoming connection (%s): waking the server up…", ev.from))
 	if s.d.TestWakeDelay > 0 {
-		s.log(fmt.Sprintf("Test : démarrage retardé de %s.", s.d.TestWakeDelay))
+		s.log(fmt.Sprintf("Test: start delayed by %s.", s.d.TestWakeDelay))
 		select {
 		case <-ctx.Done():
 			return
@@ -431,7 +431,7 @@ func (s *Sleeper) wakeUp(ctx context.Context, ev wakeEvent) {
 		}
 	}
 	if err := s.d.Start(ctx); err != nil {
-		s.log("Réveil impossible : " + err.Error())
+		s.log("Wake-up failed: " + err.Error())
 		s.mu.Lock()
 		s.handoff = false
 		s.closeLocked("")
@@ -459,9 +459,9 @@ type bindRequest struct {
 func (r bindRequest) String() string {
 	family := map[int]string{afInet: "IPv4", afInet6: "IPv6"}[r.domain]
 	if family == "" {
-		family = "inconnue"
+		family = "unknown"
 	}
-	return fmt.Sprintf("famille %s, v6only=%t, joker=%t, SO_REUSEADDR=%t, SO_REUSEPORT=%t",
+	return fmt.Sprintf("family %s, v6only=%t, wildcard=%t, SO_REUSEADDR=%t, SO_REUSEPORT=%t",
 		family, r.v6only, r.any, r.reuseAddr, r.reusePort)
 }
 
@@ -482,7 +482,7 @@ func (s *Sleeper) bindRequested(req bindRequest, reply *net.UnixConn) bool {
 			err := passSocket(reply, s.conn)
 			if err == nil {
 				s.handoff = false
-				s.closeLocked(fmt.Sprintf("Port UDP %d transmis au serveur avec les connexions en attente (%s après le début du démarrage).", s.connPort, elapsed))
+				s.closeLocked(fmt.Sprintf("UDP port %d handed over to the server with the waiting connections (%s after the start).", s.connPort, elapsed))
 				// The hook keeps the server from reading the socket until
 				// it has booted: it would turn the players away before.
 				s.openGateLocked("")
@@ -490,7 +490,7 @@ func (s *Sleeper) bindRequested(req bindRequest, reply *net.UnixConn) bool {
 				s.gate, s.gateAt = reply, s.d.Now()
 				return true
 			}
-			s.log("Transmission du socket impossible (" + err.Error() + ") : le port est simplement libéré.")
+			s.log(fmt.Sprintf("Could not hand the socket over (%s): the port is simply released.", err))
 		case req.domain == afInet6 && (req.v6only || req.reuseAddr || req.reusePort):
 			// No conflict with the IPv4 sentinel, which shares the port
 			// (SO_REUSEADDR and SO_REUSEPORT): keep holding it.
@@ -498,7 +498,7 @@ func (s *Sleeper) bindRequested(req bindRequest, reply *net.UnixConn) bool {
 		}
 	}
 	s.handoff = false
-	s.closeLocked(fmt.Sprintf("Port UDP %d remis au serveur au moment de son bind (%s après le début du démarrage ; bind : %s).", s.connPort, elapsed, req))
+	s.closeLocked(fmt.Sprintf("UDP port %d released to the server when it bound it (%s after the start; bind: %s).", s.connPort, elapsed, req))
 	return false
 }
 
@@ -547,10 +547,10 @@ func (s *Sleeper) reportLocked() string {
 	parts := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		f := s.flows[a]
-		parts = append(parts, fmt.Sprintf("%s ×%d (de +%.1fs à +%.1fs)", a, f.packets,
+		parts = append(parts, fmt.Sprintf("%s ×%d (from +%.1fs to +%.1fs)", a, f.packets,
 			f.first.Sub(s.wokenAt).Seconds(), f.last.Sub(s.wokenAt).Seconds()))
 	}
-	return "Tentatives de connexion reçues pendant la veille : " + strings.Join(parts, ", ")
+	return "Connection attempts received while asleep: " + strings.Join(parts, ", ")
 }
 
 func (s *Sleeper) log(message string) {

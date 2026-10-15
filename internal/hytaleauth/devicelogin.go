@@ -110,7 +110,7 @@ func (d *DeviceLogin) poll(ctx context.Context, code hytaleapi.DeviceCode) {
 	for {
 		select {
 		case <-ctx.Done():
-			d.finish(ctx, errors.New("le code a expiré, recommencez la connexion"))
+			d.finish(ctx, errors.New("the code expired, start the sign-in again"))
 			return
 		case <-time.After(interval):
 		}

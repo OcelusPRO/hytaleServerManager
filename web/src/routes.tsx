@@ -1,5 +1,6 @@
 import { Gauge, Globe, Settings, SquareTerminal, Users, type LucideIcon } from "lucide-react";
 import type { ComponentType } from "react";
+import type { MessageKey } from "./lib/i18n";
 import { ConsolePage } from "./pages/ConsolePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PlayersPage } from "./pages/players/PlayersPage";
@@ -8,18 +9,18 @@ import { WorldsPage } from "./pages/worlds/WorldsPage";
 
 export interface AppRoute {
   path: string;
-  label: string;
+  label: MessageKey;
   icon: LucideIcon;
   page: ComponentType;
 }
 
 /** Pages of the interface, in navigation order. */
 export const ROUTES: AppRoute[] = [
-  { path: "/", label: "Tableau de bord", icon: Gauge, page: DashboardPage },
-  { path: "/console", label: "Console", icon: SquareTerminal, page: ConsolePage },
-  { path: "/worlds", label: "Mondes", icon: Globe, page: WorldsPage },
-  { path: "/players", label: "Joueurs", icon: Users, page: PlayersPage },
-  { path: "/settings", label: "Paramètres", icon: Settings, page: SettingsPage },
+  { path: "/", label: "common.nav.dashboard", icon: Gauge, page: DashboardPage },
+  { path: "/console", label: "common.nav.console", icon: SquareTerminal, page: ConsolePage },
+  { path: "/worlds", label: "common.nav.worlds", icon: Globe, page: WorldsPage },
+  { path: "/players", label: "common.nav.players", icon: Users, page: PlayersPage },
+  { path: "/settings", label: "common.nav.settings", icon: Settings, page: SettingsPage },
 ];
 
 /** Paths used by in-page links, kept next to the route table. */

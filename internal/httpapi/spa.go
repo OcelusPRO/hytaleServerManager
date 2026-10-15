@@ -15,7 +15,7 @@ func spaHandler(static fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
-			writeMessage(w, http.StatusMethodNotAllowed, "méthode non autorisée")
+			writeMessage(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")

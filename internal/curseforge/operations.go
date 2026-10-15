@@ -16,7 +16,7 @@ import (
 )
 
 // ErrUnsupportedPack is returned for modpacks without a CurseForge manifest.
-var ErrUnsupportedPack = errors.New("format de modpack non reconnu (manifest.json introuvable)")
+var ErrUnsupportedPack = errors.New("unrecognised modpack format (manifest.json not found)")
 
 const maxManifestBytes = 8 << 20
 
@@ -26,8 +26,8 @@ func (s *Service) StartUpdates(saveID string, fileNames []string) (Job, error) {
 	if _, err := s.Mods.Links(saveID); err != nil {
 		return Job{}, err
 	}
-	return s.startJob(saveID, "Mise à jour des mods", func(ctx context.Context, h *JobHandle) error {
-		h.Progress(0, "Recherche des mises à jour…")
+	return s.startJob(saveID, "Updating mods", func(ctx context.Context, h *JobHandle) error {
+		h.Progress(0, "Looking for updates…")
 		updates, projects, err := s.findUpdates(ctx, saveID)
 		if err != nil {
 			return err
@@ -36,11 +36,11 @@ func (s *Service) StartUpdates(saveID string, fileNames []string) (Job, error) {
 			updates = slices.DeleteFunc(updates, func(u UpdateInfo) bool { return !slices.Contains(fileNames, u.FileName) })
 		}
 		if len(updates) == 0 {
-			h.Progress(1, "Tout est à jour")
+			h.Progress(1, "Everything is up to date")
 			return nil
 		}
 		for i, u := range updates {
-			h.Progress(float64(i)/float64(len(updates)), "Mise à jour de "+u.Name)
+			h.Progress(float64(i)/float64(len(updates)), fmt.Sprintf("Updating %s", u.Name))
 			project := projects[u.ProjectID]
 			file, ok := pickFile(project.LatestFiles)
 			if !ok {
@@ -70,13 +70,13 @@ func (s *Service) StartModpack(saveID string, packID, fileID int) (Job, error) {
 	if _, err := s.Mods.Links(saveID); err != nil {
 		return Job{}, err
 	}
-	return s.startJob(saveID, "Installation d'un modpack", func(ctx context.Context, h *JobHandle) error {
+	return s.startJob(saveID, "Installing a modpack", func(ctx context.Context, h *JobHandle) error {
 		return s.installModpack(ctx, saveID, packID, fileID, h)
 	})
 }
 
 func (s *Service) installModpack(ctx context.Context, saveID string, packID, fileID int, h *JobHandle) error {
-	h.Progress(0, "Récupération du modpack…")
+	h.Progress(0, "Fetching the modpack…")
 	pack, err := s.Client.Mod(ctx, packID)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (s *Service) installModpack(ctx context.Context, saveID string, packID, fil
 	if err != nil {
 		return err
 	}
-	h.Progress(0.02, "Téléchargement de « "+pack.Name+" »…")
+	h.Progress(0.02, fmt.Sprintf("Downloading “%s”…", pack.Name))
 	zipPath, err := s.download(ctx, pack, file)
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func (s *Service) installModpack(ctx context.Context, saveID string, packID, fil
 			projectIDs = append(projectIDs, f.ProjectID)
 		}
 	}
-	h.Progress(0.05, "Résolution des fichiers du pack…")
+	h.Progress(0.05, "Resolving the pack's files…")
 	files := map[int]File{}
 	for chunk := range slices.Chunk(fileIDs, batchSize) {
 		list, err := s.Client.Files(ctx, chunk)
@@ -140,7 +140,7 @@ func (s *Service) installModpack(ctx context.Context, saveID string, packID, fil
 		}
 		f, ok := files[id]
 		if !ok {
-			h.Warn(fmt.Sprintf("fichier %d introuvable sur CurseForge", id))
+			h.Warn(fmt.Sprintf("file %d not found on CurseForge", id))
 			continue
 		}
 		project, ok := projects[f.ModID]
@@ -153,7 +153,7 @@ func (s *Service) installModpack(ctx context.Context, saveID string, packID, fil
 		}
 	}
 
-	h.Progress(0.92, "Copie des fichiers de configuration…")
+	h.Progress(0.92, "Copying configuration files…")
 	return s.applyOverrides(zipPath, saveID, manifest.Overrides)
 }
 
@@ -174,7 +174,7 @@ func readManifest(zipPath string) (packManifest, error) {
 		defer rc.Close()
 		var m packManifest
 		if err := json.NewDecoder(io.LimitReader(rc, maxManifestBytes)).Decode(&m); err != nil {
-			return packManifest{}, fmt.Errorf("manifest du modpack illisible : %w", err)
+			return packManifest{}, fmt.Errorf("unreadable modpack manifest: %w", err)
 		}
 		if m.Overrides == "" {
 			m.Overrides = "overrides"

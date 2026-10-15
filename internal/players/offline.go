@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 // so they are only edited directly while it is stopped.
 
 // ErrNotInList is returned when the player is not in the edited list.
-var ErrNotInList = errors.New("ce joueur n'est pas dans la liste")
+var ErrNotInList = errors.New("this player is not in the list")
 
 // RemoveBan deletes the bans targeting uuid from bans.json.
 func RemoveBan(saveDir, uuid string) error {
@@ -112,7 +113,7 @@ func editJSON(path string, mutate func(doc any) (any, bool)) error {
 	dec.UseNumber()
 	var doc any
 	if err := dec.Decode(&doc); err != nil {
-		return errors.New(filepath.Base(path) + " est illisible")
+		return fmt.Errorf("%s is unreadable", filepath.Base(path))
 	}
 	doc, changed := mutate(doc)
 	if !changed {

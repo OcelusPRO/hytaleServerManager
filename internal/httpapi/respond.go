@@ -43,15 +43,15 @@ func writeError(w http.ResponseWriter, logger *slog.Logger, err error) {
 // decodeJSON strictly decodes a small JSON body into v.
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
-		return errBadRequest("le corps doit être du JSON")
+		return errBadRequest("the body must be JSON")
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBody))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return errBadRequest(fmt.Sprintf("JSON invalide: %v", err))
+		return errBadRequest(fmt.Sprintf("invalid JSON: %v", err))
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return errBadRequest("un seul objet JSON est attendu")
+		return errBadRequest("a single JSON object is expected")
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import { serverStates } from "../../lib/serverState";
 import { Badge } from "../ui/Badge";
 import type { AppRoute } from "../../routes";
 import { Logo } from "./Logo";
+import { translate as t } from "../../lib/i18n";
 
 interface SidebarProps {
   items: AppRoute[];
@@ -23,7 +24,7 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
         <Logo />
         {state && (
           <Badge tone={state.tone} dot pulse={server?.state === "running"} className="lg:hidden">
-            {state.label}
+            {t(state.label)}
           </Badge>
         )}
       </div>
@@ -42,7 +43,7 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
             }
           >
             <Icon className="size-4 text-zinc-500 group-[.active]:text-brand-400" aria-hidden />
-            {label}
+            {t(label)}
           </NavLink>
         ))}
       </nav>
@@ -50,9 +51,9 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
       <div className="hidden border-t border-white/[0.06] p-3 lg:block">
         {state && (
           <div className="mb-2 flex items-center justify-between rounded-lg px-3 py-2">
-            <span className="text-xs text-zinc-500">Serveur</span>
+            <span className="text-xs text-zinc-500">{t("shell.sidebar.server")}</span>
             <Badge tone={state.tone} dot pulse={server?.state === "running"}>
-              {state.label}
+              {t(state.label)}
             </Badge>
           </div>
         )}
@@ -62,7 +63,7 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
           className="flex h-9 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.03] hover:text-zinc-200"
         >
           <LogOut className="size-4 text-zinc-500" aria-hidden />
-          Se déconnecter
+          {t("shell.sidebar.logout")}
         </button>
       </div>
     </aside>
