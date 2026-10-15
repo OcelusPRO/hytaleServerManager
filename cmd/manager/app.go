@@ -280,7 +280,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 			if id == "" {
 				return nil
 			}
-			_, err := backupStore.Create(id)
+			_, err := backupStore.CreateNamed(id, saves.BackupOptions{Name: "Before server update", Origin: saves.OriginUpdate})
 			return err
 		},
 		Log: func(message string) {

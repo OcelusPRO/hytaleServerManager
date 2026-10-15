@@ -205,7 +205,14 @@ export interface Backup {
   saveId: string;
   createdAt: string;
   sizeBytes: number;
+  /** Autosave still subject to rotation (naming one turns it into a manual backup). */
   auto: boolean;
+  name: string;
+  origin: "manual" | "autosave" | "restore" | "update";
+  /** Origin precision, e.g. the id of the backup being restored. */
+  detail?: string;
+  note?: string;
+  slot?: number;
 }
 
 export type ConsoleStream = "out" | "err" | "in" | "sys";

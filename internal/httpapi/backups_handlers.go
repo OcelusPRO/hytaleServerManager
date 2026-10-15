@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"hytale-server-manager/internal/saves"
 )
 
 func (a *api) routeBackups(mux *http.ServeMux) {
@@ -11,6 +13,7 @@ func (a *api) routeBackups(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/saves/{id}/backups", a.createBackup)
 	mux.HandleFunc("GET /api/saves/{id}/backups/{backup}/download", a.downloadBackup)
 	mux.HandleFunc("POST /api/saves/{id}/backups/{backup}/restore", a.restoreBackup)
+	mux.HandleFunc("PATCH /api/saves/{id}/backups/{backup}", a.updateBackup)
 	mux.HandleFunc("DELETE /api/saves/{id}/backups/{backup}", a.deleteBackup)
 }
 
@@ -24,12 +27,37 @@ func (a *api) listBackups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) createBackup(w http.ResponseWriter, r *http.Request) {
-	backup, err := a.deps.Backups.Create(r.PathValue("id"))
+	var body struct {
+		Name string `json:"name"`
+		Note string `json:"note"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, a.log, err)
+		return
+	}
+	backup, err := a.deps.Backups.CreateNamed(r.PathValue("id"), saves.BackupOptions{Name: body.Name, Note: body.Note, Origin: saves.OriginManual})
 	if err != nil {
 		writeError(w, a.log, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, backup)
+}
+
+func (a *api) updateBackup(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+		Note string `json:"note"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, a.log, err)
+		return
+	}
+	backup, err := a.deps.Backups.Update(r.PathValue("id"), r.PathValue("backup"), body.Name, body.Note)
+	if err != nil {
+		writeError(w, a.log, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, backup)
 }
 
 func (a *api) downloadBackup(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +95,7 @@ func (a *api) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.deps.Settings.Get().BackupBeforeRestore {
-		if _, err := a.deps.Backups.Create(saveID); err != nil {
+		if _, err := a.deps.Backups.CreateNamed(saveID, saves.BackupOptions{Name: "Before restore", Origin: saves.OriginRestore, Detail: backupID}); err != nil {
 			writeError(w, a.log, fmt.Errorf("safety backup before restore: %w", err))
 			return
 		}

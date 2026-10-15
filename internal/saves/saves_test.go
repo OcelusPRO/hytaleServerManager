@@ -1,6 +1,7 @@
 package saves
 
 import (
+	"fmt"
 	"bytes"
 	"errors"
 	"os"
@@ -152,5 +153,31 @@ func TestAutosaveRotation(t *testing.T) {
 	}
 	if _, err := backups.Path(save.ID, manual.ID); err != nil {
 		t.Fatalf("manual backup was removed: %v", err)
+	}
+}
+
+func TestAutosaveSlotsAndNaming(t *testing.T) {
+	store, _, backups := newStores(t)
+	save, _ := store.Create("Monde")
+	var ids []string
+	for i := 0; i < 3; i++ {
+		b, err := backups.CreateAuto(save.ID, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := []int{1, 2, 1}[i]; b.Slot != want || b.Name != fmt.Sprintf("Autosave %d", want) {
+			t.Fatalf("autosave %d got slot %d name %q", i, b.Slot, b.Name)
+		}
+		ids = append(ids, b.ID)
+		time.Sleep(1100 * time.Millisecond)
+	}
+	// Naming the newest autosave turns it into a manual backup.
+	named, err := backups.Update(save.ID, ids[2], "Avant le boss", "note")
+	if err != nil || named.Auto || named.Name != "Avant le boss" || named.Origin != OriginAutosave {
+		t.Fatalf("update: %+v %v", named, err)
+	}
+	b, err := backups.CreateNamed(save.ID, BackupOptions{Name: "x", Origin: OriginRestore, Detail: ids[1]})
+	if err != nil || b.Origin != OriginRestore || b.Detail != ids[1] {
+		t.Fatalf("named backup: %+v %v", b, err)
 	}
 }

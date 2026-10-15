@@ -1,4 +1,4 @@
-import { Archive, Download, History, Plus, Trash2 } from "lucide-react";
+import { Archive, Download, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -18,18 +18,48 @@ interface BackupsPanelProps {
 }
 
 export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelProps) {
-  const { run, confirm } = useFeedback();
+  const { run, confirm, prompt } = useFeedback();
   const base = `/api/saves/${seg(saveId)}/backups`;
 
   const create = async () => {
-    await run(() => api.post(base), t("worlds.backups.created"));
+    const name = await prompt({ title: t("worlds.backups.create"), label: t("worlds.backups.nameLabel"), placeholder: t("worlds.backups.namePlaceholder"), maxLength: 80, optional: true, confirmLabel: t("worlds.backups.create") });
+    if (name === null) return;
+    const note = await prompt({ title: t("worlds.backups.create"), label: t("worlds.backups.noteLabel"), maxLength: 500, optional: true, confirmLabel: t("worlds.backups.create") });
+    if (note === null) return;
+    await run(() => api.post(base, { name, note }), t("worlds.backups.created"));
     await onChange();
+  };
+
+  const rename = async (b: Backup) => {
+    const name = await prompt({ title: t("worlds.backups.renameTitle"), label: t("worlds.backups.nameLabel"), defaultValue: b.name, maxLength: 80, confirmLabel: t("worlds.backups.rename") });
+    if (name === null) return;
+    const note = await prompt({ title: t("worlds.backups.renameTitle"), label: t("worlds.backups.noteLabel"), defaultValue: b.note ?? "", maxLength: 500, optional: true, confirmLabel: t("worlds.backups.rename") });
+    if (note === null) return;
+    await run(() => api.patch(`${base}/${seg(b.id)}`, { name, note }), t("worlds.backups.renamed"));
+    await onChange();
+  };
+
+  const label = (b: Backup) => b.name || formatDate(b.createdAt);
+
+  const origin = (b: Backup) => {
+    switch (b.origin) {
+      case "autosave":
+        return t("worlds.backups.originAutosave", { slot: b.slot ?? "?" });
+      case "restore": {
+        const source = backups?.find((x) => x.id === b.detail);
+        return t("worlds.backups.originRestore", { name: source ? label(source) : (b.detail ?? "") });
+      }
+      case "update":
+        return t("worlds.backups.originUpdate");
+      default:
+        return t("worlds.backups.originManual");
+    }
   };
 
   const restore = async (b: Backup) => {
     const ok = await confirm({
       title: t("worlds.backups.restoreTitle"),
-      message: t("worlds.backups.restoreMessage", { date: formatDate(b.createdAt) }),
+      message: t("worlds.backups.restoreMessage", { date: label(b) }),
       confirmLabel: t("worlds.backups.restore"),
     });
     if (!ok) return;
@@ -61,6 +91,7 @@ export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelP
           <Table>
             <thead>
               <tr>
+                <Th>{t("worlds.backups.name")}</Th>
                 <Th>{t("worlds.backups.date")}</Th>
                 <Th className="w-28 text-right">{t("worlds.backups.size")}</Th>
                 <Th className="w-56" />
@@ -70,11 +101,14 @@ export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelP
               {backups.map((b) => (
                 <Tr key={b.id}>
                   <Td className="font-medium text-zinc-100">
-                    <span className="inline-flex items-center gap-2">
-                      {formatDate(b.createdAt)}
-                      {b.auto && <Badge tone="info">{t("worlds.backups.auto")}</Badge>}
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {b.name || t("worlds.backups.unnamed")}
+                      <Badge tone={b.auto ? "info" : "neutral"}>{b.auto ? t("worlds.backups.auto") : t("worlds.backups.manual")}</Badge>
                     </span>
+                    <span className="block text-xs font-normal text-zinc-500">{origin(b)}</span>
+                    {b.note && <span className="block max-w-md text-xs font-normal whitespace-pre-line text-zinc-400">{b.note}</span>}
                   </Td>
+                  <Td className="whitespace-nowrap">{formatDate(b.createdAt)}</Td>
                   <Td className="text-right tabular-nums">{formatBytes(b.sizeBytes)}</Td>
                   <Td>
                     <div className="flex items-center justify-end gap-1">
@@ -88,6 +122,7 @@ export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelP
                       <Button size="sm" variant="ghost" icon={History} disabled={inUse} onClick={() => restore(b)}>
                         {t("worlds.backups.restore")}
                       </Button>
+                      <Button size="sm" variant="ghost" icon={Pencil} onClick={() => rename(b)} aria-label={t("worlds.backups.rename")} />
                       <Button size="sm" variant="ghost" icon={Trash2} onClick={() => remove(b)} aria-label={t("worlds.backups.deleteBackup")} />
                     </div>
                   </Td>
