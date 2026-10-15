@@ -25,6 +25,8 @@
 @layer base {
   html {
     color-scheme: dark;
+    /* Live content (console feed, charts) must never nudge the scroll position. */
+    overflow-anchor: none;
   }
   body {
     @apply bg-zinc-950 text-zinc-100 font-sans antialiased;

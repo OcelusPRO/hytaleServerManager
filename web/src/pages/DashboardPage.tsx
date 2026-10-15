@@ -60,7 +60,7 @@ function RecentConsole() {
           </Link>
         }
       />
-      <div className="m-5 mt-4 h-72 overflow-hidden rounded-lg bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed ring-1 ring-white/[0.06]">
+      <div className="m-5 mt-4 h-72 overflow-hidden [contain:layout_paint] rounded-lg bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed ring-1 ring-white/[0.06]">
         {recent.length === 0 ? (
           <p className="text-zinc-600">{t("pages.dashboard.noActivity")}</p>
         ) : (
