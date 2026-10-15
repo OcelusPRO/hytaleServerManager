@@ -9,6 +9,8 @@ import { Card, CardHeader } from "../ui/Card";
 
 const RANGES: MetricsRange[] = ["1h", "6h", "24h", "7d", "14d"];
 const RANGE_KEY = "hsm.metricsRange";
+// The server samples every 5 s: the panel follows at the same pace.
+const REFRESH_MS = 5000;
 
 // Chart colors, validated as a pair against the zinc-900 card surface
 // (dark mode): Java process in yellow, whole container in violet.
@@ -292,12 +294,13 @@ function Figure({ label, value, hint, swatch }: { label: string; value: ReactNod
 /** Resource history of the server: memory, CPU, players and states. */
 export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
   const [range, setRange] = useState<MetricsRange>(loadRange);
-  const [hover, setHover] = useState<number | null>(null);
+  // The hovered point is followed by its time: points shift as new samples arrive.
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [ref, width] = useWidth<HTMLDivElement>();
-  const { data, refresh } = usePolling(() => api.get<MetricsSeries>(`/api/metrics?range=${range}`), 30000);
+  const { data, refresh } = usePolling(() => api.get<MetricsSeries>(`/api/metrics?range=${range}`), REFRESH_MS);
 
   useEffect(() => {
-    setHover(null);
+    setHoverTime(null);
     void refresh();
   }, [range, refresh]);
 
@@ -307,6 +310,9 @@ export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
   };
 
   const points = data?.points ?? [];
+  const hoverIndex = points.findIndex((p) => p.t === hoverTime);
+  const hover = hoverIndex >= 0 ? hoverIndex : null;
+  const setHover = (i: number | null) => setHoverTime(i === null ? null : (points[i]?.t ?? null));
   const summary = data?.summary;
   const seconds = (s: State) => (summary ? { running: summary.runningSeconds, sleeping: summary.sleepingSeconds, stopped: summary.stoppedSeconds }[s] : 0);
   const total = STATES.reduce((sum, s) => sum + seconds(s), 0);
