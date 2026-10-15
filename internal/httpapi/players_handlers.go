@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"net/http"
+	"regexp"
+	"strings"
 
 	"hytale-server-manager/internal/players"
 )
@@ -9,6 +11,7 @@ import (
 // routePlayers registers player management endpoints.
 func (a *api) routePlayers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/players", a.listPlayers)
+	mux.HandleFunc("GET /api/players/{uuid}", a.getPlayer)
 	mux.HandleFunc("POST /api/players/action", a.playerAction)
 	mux.HandleFunc("POST /api/players/remove", a.playerRemove)
 	mux.HandleFunc("PUT /api/players/whitelist", a.setWhitelist)
@@ -72,4 +75,34 @@ func (a *api) setWhitelist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.respondAction(w, a.deps.PlayerAccess.SetWhitelist(body.Enabled))
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+type playerDetails struct {
+	UUID string `json:"uuid"`
+	// Registered is what the manager stored about the player; absent when it
+	// never saw them connect.
+	Registered *players.RegisteredPlayer `json:"registered,omitempty"`
+	Online     *players.OnlinePlayer     `json:"online,omitempty"`
+}
+
+// getPlayer returns everything the manager keeps about one player.
+func (a *api) getPlayer(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if !uuidPattern.MatchString(uuid) {
+		writeError(w, a.log, errBadRequest("invalid player id"))
+		return
+	}
+	out := playerDetails{UUID: uuid}
+	if reg, ok := a.deps.PlayerAccess.Registered(uuid); ok {
+		out.Registered = &reg
+	}
+	for _, p := range a.deps.Players.Online() {
+		if strings.EqualFold(p.UUID, uuid) {
+			online := p
+			out.Online = &online
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }

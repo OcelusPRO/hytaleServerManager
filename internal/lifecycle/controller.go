@@ -67,6 +67,8 @@ type Controller struct {
 	// while asleep) right before the process starts.
 	beforeStart func()
 	launchEnv   func(settings.Settings) []string
+	// prepareSave runs once the save is known, before the process starts.
+	prepareSave func(saveDir string) error
 
 	ops      sync.Mutex // serialises start/stop/restart
 	session  sessionHolder
@@ -86,6 +88,10 @@ type Deps struct {
 	BeforeStart func()
 	// LaunchEnv, optional, adds environment variables to the server.
 	LaunchEnv func(settings.Settings) []string
+	// PrepareSave, optional, runs before each start with the directory of
+	// the save about to be used (e.g. to install a plugin). A failure is
+	// logged to the console and does not prevent the start.
+	PrepareSave func(saveDir string) error
 }
 
 // New creates a controller and subscribes to process exits.
@@ -100,6 +106,7 @@ func New(d Deps) *Controller {
 		homeDir:     d.HomeDir,
 		beforeStart: d.BeforeStart,
 		launchEnv:   d.LaunchEnv,
+		prepareSave: d.PrepareSave,
 		restarts:    newRestartBudget(3, 10*time.Minute),
 	}
 	d.Process.OnExit(c.handleExit)
@@ -180,6 +187,11 @@ func (c *Controller) startLocked(ctx context.Context) error {
 		return ErrNoActiveSave
 	}
 
+	if c.prepareSave != nil {
+		if err := c.prepareSave(saveDir); err != nil {
+			c.console.System(fmt.Sprintf("Could not prepare the world: %v", err))
+		}
+	}
 	javaTmp := filepath.Join(c.homeDir, "tmp")
 	if err := os.MkdirAll(javaTmp, 0o750); err != nil {
 		return err

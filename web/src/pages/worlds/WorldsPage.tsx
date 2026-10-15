@@ -1,5 +1,6 @@
 import { FileArchive, Globe, Plus } from "lucide-react";
 import { useRef, useState } from "react";
+import { WorldLive, useStreamOverview } from "../../components/metrics/LiveMetrics";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -23,6 +24,7 @@ export function WorldsPage() {
   const [selectedId, setSelectedId] = useState<string>();
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const stream = useStreamOverview();
 
   const saves = data?.saves ?? [];
   const selected: Save | undefined =
@@ -89,6 +91,13 @@ export function WorldsPage() {
         </Card>
       )}
 
+      {/* The world the server is running, whichever world is selected below. */}
+      {stream?.connected && stream.worlds.length > 0 && (
+        <Card className="py-5">
+          <WorldLive overview={stream} />
+        </Card>
+      )}
+
       {data && saves.length === 0 ? (
         <Card>
           <EmptyState
@@ -103,7 +112,7 @@ export function WorldsPage() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <Card className="p-2">
             <ul className="flex flex-col gap-1">
               {saves.map((save) => {

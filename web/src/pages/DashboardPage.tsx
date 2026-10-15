@@ -2,6 +2,7 @@ import { ArrowRight, Clock, Globe, Package, Users, type LucideIcon } from "lucid
 import type { ReactNode } from "react";
 import { HostWarnings } from "../components/HostWarnings";
 import { HytaleConnect } from "../components/hytale/HytaleConnect";
+import { EventLines, useStreamEvents, useStreamOverview } from "../components/metrics/LiveMetrics";
 import { ResourceCharts } from "../components/metrics/ResourceCharts";
 import { PageHeader } from "../components/layout/PageHeader";
 import { ServerControls } from "../components/ServerControls";
@@ -44,8 +45,10 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function RecentConsole() {
+// With the metrics plugin connected, the game events replace the raw console output.
+function RecentConsole({ live }: { live: boolean }) {
   const { lines } = useConsoleStream();
+  const events = useStreamEvents(live);
   const recent = lines.slice(-12);
   return (
     <Card className="flex flex-col lg:col-span-2">
@@ -61,7 +64,9 @@ function RecentConsole() {
         }
       />
       <div className="m-5 mt-4 h-72 overflow-hidden [contain:layout_paint] rounded-lg bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed ring-1 ring-white/[0.06]">
-        {recent.length === 0 ? (
+        {live ? (
+          <EventLines events={events} limit={12} />
+        ) : recent.length === 0 ? (
           <p className="text-zinc-600">{t("pages.dashboard.noActivity")}</p>
         ) : (
           recent.map((l) => (
@@ -82,6 +87,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { data: saves } = usePolling(() => api.get<SavesResponse>("/api/saves"), 10000);
   const { data: settings } = usePolling(() => api.get<ServerSettings>("/api/settings"), 10000);
+  const stream = useStreamOverview();
   if (!status) return null;
 
   const { server, setup, hytale } = status;
@@ -174,7 +180,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <RecentConsole />
+        <RecentConsole live={stream?.connected ?? false} />
         <Card>
           <CardHeader title={t("pages.dashboard.info")} />
           <dl className="divide-y divide-white/[0.05] px-5 pb-2">
@@ -187,7 +193,7 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <ResourceCharts maxMemoryMb={settings?.maxMemoryMb} />
+      <ResourceCharts maxMemoryMb={settings?.maxMemoryMb} running={running} />
     </div>
   );
 }

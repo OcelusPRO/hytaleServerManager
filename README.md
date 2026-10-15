@@ -46,6 +46,17 @@ depuis une interface web protégée par mot de passe (port 8080).
   (en marche, en veille, arrêté) sur 1 h à 14 jours, avec la consommation
   moyenne du conteneur dans chaque état. Mesures toutes les 5 s, agrégées par
   minute et conservées 14 jours dans `/data/manager/metrics.json`.
+- **Métriques en direct (optionnel)** : le plugin
+  [MetricsStream](internal/metricsstream) (TPS/MSPT par monde, JVM, joueurs,
+  événements de jeu : chat, blocs, morts, dégâts…) est **désactivé par défaut**.
+  Une fois l'option « Plugin de métriques en direct » activée dans les
+  réglages, le gestionnaire copie le plugin dans le dossier `mods/` du monde
+  **au prochain démarrage** du serveur (et le retire si l'option est coupée).
+  Le plugin envoie ses données en HMSP (protocole binaire UDP, voir
+  [`internal/hmsp`](internal/hmsp)) vers `127.0.0.1:9877` ; le gestionnaire
+  vérifie le HMAC (secret généré dans `/data/manager/metrics-stream.key`),
+  réassemble les fragments, décompresse et affiche le résultat sur le tableau
+  de bord. Le port se change avec `HSM_METRICS_STREAM_PORT`.
 - **Passkeys** : connexion au panneau avec l'empreinte, le visage ou le code
   d'un appareil (WebAuthn, vérifié par la bibliothèque
   [go-webauthn](https://github.com/go-webauthn/webauthn)). Une fois une passkey
@@ -92,6 +103,7 @@ Les joueurs se connectent en **UDP 5520** (QUIC) : ouvrez/redirigez ce port en U
 | `HSM_SECURE_COOKIES`  | `false` | Cookie `Secure` (à activer derrière HTTPS) |
 | `HSM_TRUST_PROXY`     | `false` | Utiliser `X-Forwarded-For` pour l'anti-bruteforce |
 | `HSM_MAX_UPLOAD_MB`   | `1024`  | Taille max d'un mod ou d'une archive importée |
+| `HSM_METRICS_STREAM_PORT` | `9877` | Port UDP local du flux du plugin de métriques (optionnel) |
 | `HSM_RESET_PASSWORD`  | `false` | Régénère le mot de passe et supprime les passkeys au démarrage (à retirer ensuite) |
 | `HSM_BINDHOOK_LIB`    | `/usr/local/lib/hsm-bindhook.so` | Bibliothèque d'interception du `bind()` (mise en veille) |
 | `HSM_SLEEP_TEST_WAKE_DELAY` | — | Test uniquement : retarde le démarrage après un réveil (ex. `90s`) pour mesurer la patience des clients |

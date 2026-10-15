@@ -51,25 +51,42 @@ func (t *Tracker) WithRegistry(r *Registry) *Tracker {
 // Observe updates presence from one console line.
 func (t *Tracker) Observe(line string) {
 	if m := leavePattern.FindStringSubmatch(line); m != nil {
-		key := strings.ToLower(m[2])
-		t.mu.Lock()
-		p, was := t.online[key]
-		delete(t.online, key)
-		t.mu.Unlock()
-		if was {
-			t.recordLeave(p)
-		}
+		t.Leave(m[2])
 		return
 	}
 	if m := joinPattern.FindStringSubmatch(line); m != nil {
-		t.names.Learn(m[2], m[1])
-		now := time.Now().UTC()
-		t.mu.Lock()
-		t.online[strings.ToLower(m[2])] = OnlinePlayer{UUID: m[2], Name: m[1], JoinedAt: now}
+		t.Join(m[2], m[1])
+	}
+}
+
+// Join marks a player as connected. It is idempotent: presence is also
+// reported by the MetricsStream plugin, and whichever source tells first
+// starts the session.
+func (t *Tracker) Join(uuid, name string) {
+	key := strings.ToLower(uuid)
+	t.names.Learn(uuid, name)
+	now := time.Now().UTC()
+	t.mu.Lock()
+	if _, already := t.online[key]; already {
 		t.mu.Unlock()
-		if t.registry != nil {
-			_ = t.registry.Joined(m[2], m[1], now) // best effort: presence must not depend on disk
-		}
+		return
+	}
+	t.online[key] = OnlinePlayer{UUID: uuid, Name: name, JoinedAt: now}
+	t.mu.Unlock()
+	if t.registry != nil {
+		_ = t.registry.Joined(uuid, name, now) // best effort: presence must not depend on disk
+	}
+}
+
+// Leave marks a player as disconnected (idempotent).
+func (t *Tracker) Leave(uuid string) {
+	key := strings.ToLower(uuid)
+	t.mu.Lock()
+	p, was := t.online[key]
+	delete(t.online, key)
+	t.mu.Unlock()
+	if was {
+		t.recordLeave(p)
 	}
 }
 

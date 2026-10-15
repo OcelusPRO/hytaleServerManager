@@ -19,7 +19,7 @@ import { translate as t, useI18n, type Lang, type MessageKey } from "../lib/i18n
 import type { AuthMode, Patchline, ServerSettings } from "../lib/types";
 
 type NumberKey = "minMemoryMb" | "maxMemoryMb" | "port" | "stopTimeoutSeconds" | "nativeBackupMinutes";
-type BoolKey = "autoStart" | "autoRestart" | "useAotCache" | "nativeBackups" | "backupBeforeRestore" | "disableSentry" | "acceptEarlyPlugins" | "autosaveEnabled" | "autoUpdate" | "sleepEnabled";
+type BoolKey = "autoStart" | "autoRestart" | "useAotCache" | "nativeBackups" | "backupBeforeRestore" | "disableSentry" | "acceptEarlyPlugins" | "autosaveEnabled" | "autoUpdate" | "sleepEnabled" | "metricsStream";
 
 const NUMBERS: { key: NumberKey; label: MessageKey; hint?: MessageKey; min: number; max: number; step?: number }[] = [
   { key: "minMemoryMb", label: "settings.server.minMemory", hint: "settings.server.minMemoryHint", min: 256, max: 262144, step: 256 },
@@ -36,6 +36,7 @@ const BOOLEANS: { key: BoolKey; label: MessageKey; description: MessageKey }[] =
   { key: "autosaveEnabled", label: "settings.behaviour.autosave", description: "settings.behaviour.autosaveHint" },
   { key: "autoUpdate", label: "settings.behaviour.autoUpdate", description: "settings.behaviour.autoUpdateHint" },
   { key: "sleepEnabled", label: "settings.behaviour.sleep", description: "settings.behaviour.sleepHint" },
+  { key: "metricsStream", label: "settings.behaviour.metricsStream", description: "settings.behaviour.metricsStreamHint" },
   { key: "nativeBackups", label: "settings.behaviour.nativeBackups", description: "settings.behaviour.nativeBackupsHint" },
   { key: "disableSentry", label: "settings.behaviour.disableSentry", description: "settings.behaviour.disableSentryHint" },
   { key: "acceptEarlyPlugins", label: "settings.behaviour.earlyPlugins", description: "settings.behaviour.earlyPluginsHint" },

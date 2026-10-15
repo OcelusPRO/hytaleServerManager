@@ -4,6 +4,13 @@ import type { Shape } from "../shape";
 export const en = {
   sidebar: { server: "Server", logout: "Sign out" },
   dialog: { ok: "OK", confirm: "Confirm", cancel: "Cancel", close: "Close" },
+  pagination: {
+    label: "Pagination",
+    range: "{from}–{to} of {total}",
+    page: "Page {page} / {pages}",
+    previous: "Previous page",
+    next: "Next page",
+  },
   setup: {
     java: "Downloading Java",
     checking: "Looking for the latest version",
@@ -41,6 +48,13 @@ export const en = {
 export const fr: Shape<typeof en> = {
   sidebar: { server: "Serveur", logout: "Se déconnecter" },
   dialog: { ok: "Valider", confirm: "Confirmer", cancel: "Annuler", close: "Fermer" },
+  pagination: {
+    label: "Pagination",
+    range: "{from}–{to} sur {total}",
+    page: "Page {page} / {pages}",
+    previous: "Page précédente",
+    next: "Page suivante",
+  },
   setup: {
     java: "Téléchargement de Java",
     checking: "Recherche de la dernière version",

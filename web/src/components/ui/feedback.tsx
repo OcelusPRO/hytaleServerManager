@@ -133,7 +133,7 @@ function Toast({ item, onClose }: { item: ToastItem; onClose: () => void }) {
 // ---------------------------------------------------------------- dialogs
 
 /** Centered dialog over a dimmed backdrop; Escape or a backdrop click dismisses it. */
-export function Modal({ children, onDismiss, label }: { children: ReactNode; onDismiss: () => void; label: string }) {
+export function Modal({ children, onDismiss, label, wide }: { children: ReactNode; onDismiss: () => void; label: string; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onDismiss();
     window.addEventListener("keydown", onKey);
@@ -147,7 +147,7 @@ export function Modal({ children, onDismiss, label }: { children: ReactNode; onD
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="relative w-full max-w-md animate-fade-in rounded-2xl bg-zinc-900 p-6 shadow-2xl ring-1 ring-white/10"
+        className={cn("relative max-h-[90vh] w-full animate-fade-in overflow-y-auto rounded-2xl bg-zinc-900 p-6 shadow-2xl ring-1 ring-white/10", wide ? "max-w-3xl" : "max-w-md")}
       >
         {children}
       </div>

@@ -9,7 +9,9 @@ import { formatDate } from "../../lib/format";
 import type { BanEntry, OnlinePlayer, PlayerRef } from "../../lib/types";
 import { AccessListCard } from "./AccessListCard";
 import { BanDetailsDialog } from "./BanDetailsDialog";
+import { useStreamOverview } from "../../components/metrics/LiveMetrics";
 import { OnlinePlayersCard } from "./OnlinePlayersCard";
+import { PlayerDetailsDialog } from "./PlayerDetailsDialog";
 import { displayName, PlayerIdentity } from "./PlayerIdentity";
 import { usePlayers } from "./usePlayers";
 import { translate as t } from "../../lib/i18n";
@@ -21,9 +23,13 @@ export function PlayersPage() {
   const { data, act, remove, setWhitelist } = usePlayers();
   const { confirm, prompt } = useFeedback();
   const [banShown, setBanShown] = useState<BanEntry | null>(null);
+  const stream = useStreamOverview();
+  const [selected, setSelected] = useState<string | null>(null);
   if (!data) return null;
 
   const live = data.live;
+  // Followed by id: the dialog closes by itself when the player leaves.
+  const selectedPlayer = data.online.find((p) => p.uuid === selected);
 
   const ban = async (player: OnlinePlayer | PlayerRef | string) => {
     const name = typeof player === "string" ? player : target(player);
@@ -65,6 +71,7 @@ export function PlayersPage() {
         onOp={(p) => void act("op", p.name, t("players.op.done", { name: p.name }))}
         onKick={(p) => void kick(p)}
         onBan={(p) => void ban(p)}
+        onSelect={(p) => setSelected(p.uuid)}
       />
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
@@ -143,6 +150,8 @@ export function PlayersPage() {
           )}
         />
       </div>
+
+      {selectedPlayer && <PlayerDetailsDialog key={selectedPlayer.uuid} player={selectedPlayer} roster={data} stream={stream} onClose={() => setSelected(null)} />}
 
       {banShown && <BanDetailsDialog ban={banShown} onClose={() => setBanShown(null)} onUnban={() => unban(banShown)} />}
     </div>

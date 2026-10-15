@@ -4,7 +4,7 @@ import { Alert } from "./ui/Alert";
 
 function Command({ children }: { children: string }) {
   return (
-    <pre className="mt-1.5 overflow-x-auto rounded-md bg-zinc-950/70 px-3 py-2 font-mono text-xs text-zinc-200 ring-1 ring-white/[0.06] scrollbar-thin">
+    <pre className="mt-1.5 break-all whitespace-pre-wrap rounded-md bg-zinc-950/70 px-3 py-2 font-mono text-xs text-zinc-200 ring-1 ring-white/[0.06]">
       {children}
     </pre>
   );

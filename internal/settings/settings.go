@@ -55,6 +55,10 @@ type Settings struct {
 	// it again as soon as a player tries to connect.
 	SleepEnabled     bool `json:"sleepEnabled"`
 	SleepIdleMinutes int  `json:"sleepIdleMinutes"`
+	// MetricsStream installs the optional MetricsStream plugin in the server
+	// and receives its metrics stream (see internal/metricsstream). Off by
+	// default: nothing is added to the server unless the operator opts in.
+	MetricsStream bool `json:"metricsStream"`
 	// GameLanguage is the language of the announcements shown to players
 	// in game (automatic updates).
 	GameLanguage string `json:"gameLanguage"`

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"hytale-server-manager/internal/fsutil"
+	"hytale-server-manager/internal/metricsstream"
 )
 
 const (
@@ -76,7 +77,8 @@ func (m *ModStore) List(saveID string) ([]Mod, error) {
 			return nil, err
 		}
 		for _, e := range entries {
-			if !e.Type().IsRegular() || !modNamePattern.MatchString(e.Name()) {
+			// The metrics plugin is managed by the settings, not as a mod.
+			if !e.Type().IsRegular() || !modNamePattern.MatchString(e.Name()) || e.Name() == metricsstream.JarName {
 				continue
 			}
 			info, err := e.Info()

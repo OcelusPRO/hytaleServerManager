@@ -2,6 +2,7 @@ package players
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -143,4 +144,14 @@ func (s *Service) SetWhitelist(enabled bool) error {
 		return s.console.Send(WhitelistCommand(enabled))
 	}
 	return SetWhitelistEnabled(dir, enabled)
+}
+
+// Registered returns what the manager stored about uuid (first and last
+// connection, playtime, previous names, ban history).
+func (s *Service) Registered(uuid string) (RegisteredPlayer, bool) {
+	if s.registry == nil {
+		return RegisteredPlayer{}, false
+	}
+	p, ok := s.registry.All()[strings.ToLower(uuid)]
+	return p, ok
 }

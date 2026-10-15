@@ -28,6 +28,9 @@ type Config struct {
 	// SleepTestWakeDelay postpones the server start after a wake-up, to
 	// measure how long players' clients keep trying. Testing only.
 	SleepTestWakeDelay time.Duration
+	// MetricsStreamPort is the loopback UDP port receiving the optional
+	// metrics plugin stream.
+	MetricsStreamPort int
 }
 
 // Load reads the configuration from the environment, applying defaults.
@@ -53,6 +56,12 @@ func Load() (Config, error) {
 		if cfg.SleepTestWakeDelay, err = time.ParseDuration(v); err != nil {
 			return Config{}, fmt.Errorf("HSM_SLEEP_TEST_WAKE_DELAY: %w", err)
 		}
+	}
+	if cfg.MetricsStreamPort, err = envInt("HSM_METRICS_STREAM_PORT", 9877); err != nil {
+		return Config{}, err
+	}
+	if cfg.MetricsStreamPort < 1 || cfg.MetricsStreamPort > 65535 {
+		return Config{}, fmt.Errorf("HSM_METRICS_STREAM_PORT must be a valid port")
 	}
 	maxUploadMB, err := envInt("HSM_MAX_UPLOAD_MB", 1024)
 	if err != nil {

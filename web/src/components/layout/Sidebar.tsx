@@ -29,7 +29,7 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
         )}
       </div>
 
-      <nav className="scrollbar-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:pt-2">
+      <nav className="grid grid-cols-5 gap-1 px-2 pb-3 lg:flex lg:flex-1 lg:flex-col lg:px-3 lg:pt-2">
         {items.map(({ path, label, icon: Icon }) => (
           <NavLink
             key={path}
@@ -37,7 +37,9 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
             end
             className={({ isActive }) =>
               cn(
-                "group flex h-9 shrink-0 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                "group flex min-w-0 items-center rounded-lg font-medium transition-colors",
+                "max-lg:min-h-14 max-lg:flex-col max-lg:justify-center max-lg:gap-1 max-lg:px-1 max-lg:text-center max-lg:text-[11px] max-lg:leading-tight",
+                "lg:h-9 lg:shrink-0 lg:gap-3 lg:px-3 lg:text-sm",
                 isActive ? "active bg-white/[0.06] text-zinc-50" : "text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200",
               )
             }

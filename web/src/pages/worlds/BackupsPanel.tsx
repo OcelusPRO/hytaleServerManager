@@ -100,7 +100,7 @@ export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelP
             <tbody>
               {backups.map((b) => (
                 <Tr key={b.id}>
-                  <Td className="font-medium text-zinc-100">
+                  <Td className="font-medium text-zinc-100 max-sm:w-full">
                     <span className="inline-flex flex-wrap items-center gap-2">
                       {b.name || t("worlds.backups.unnamed")}
                       <Badge tone={b.auto ? "info" : "neutral"}>{b.auto ? t("worlds.backups.auto") : t("worlds.backups.manual")}</Badge>
@@ -109,8 +109,8 @@ export function BackupsPanel({ saveId, backups, inUse, onChange }: BackupsPanelP
                     {b.note && <span className="block max-w-md text-xs font-normal whitespace-pre-line text-zinc-400">{b.note}</span>}
                   </Td>
                   <Td className="whitespace-nowrap">{formatDate(b.createdAt)}</Td>
-                  <Td className="text-right tabular-nums">{formatBytes(b.sizeBytes)}</Td>
-                  <Td>
+                  <Td className="text-right tabular-nums max-sm:text-left">{formatBytes(b.sizeBytes)}</Td>
+                  <Td className="max-sm:ml-auto">
                     <div className="flex items-center justify-end gap-1">
                       <a
                         href={`${base}/${seg(b.id)}/download`}

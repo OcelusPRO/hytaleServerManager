@@ -29,6 +29,7 @@ import (
 	"hytale-server-manager/internal/install"
 	"hytale-server-manager/internal/lifecycle"
 	"hytale-server-manager/internal/metrics"
+	"hytale-server-manager/internal/metricsstream"
 	"hytale-server-manager/internal/passkey"
 	"hytale-server-manager/internal/paths"
 	"hytale-server-manager/internal/players"
@@ -62,6 +63,7 @@ type app struct {
 	sleeper     *sleep.Sleeper
 	hostChecks  *hostcheck.Monitor
 	metrics     *metrics.Collector
+	stream      *metricsstream.Service
 }
 
 func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
@@ -125,16 +127,30 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 
 	saveStore := saves.NewStore(layout.SavesDir(), layout.TmpDir())
 	backupLimits := archive.Limits{MaxFiles: 1_000_000, MaxTotalBytes: 200 << 30}
+	stream := metricsstream.New(metricsstream.Deps{
+		SecretPath: layout.File("metrics-stream.key"),
+		Port:       cfg.MetricsStreamPort,
+		Enabled:    func() bool { return settingsStore.Get().MetricsStream },
+		OnPlayer: func(joined bool, uuid, name string) {
+			if joined {
+				tracker.Join(uuid, name)
+			} else {
+				tracker.Leave(uuid)
+			}
+		},
+		Logger: logger,
+	})
 	var sleeper *sleep.Sleeper // needs the controller, which must free its port
 	hookSocket := bindHookSocket(cfg, layout)
 	controller := lifecycle.New(lifecycle.Deps{
-		Process:  process,
-		Console:  console,
-		Settings: settingsStore,
-		Saves:    saveStore,
-		Install:  provisioner,
-		Auth:     hytaleAuth,
-		HomeDir:  layout.HomeDir(),
+		Process:     process,
+		Console:     console,
+		Settings:    settingsStore,
+		Saves:       saveStore,
+		Install:     provisioner,
+		Auth:        hytaleAuth,
+		HomeDir:     layout.HomeDir(),
+		PrepareSave: stream.Prepare,
 		BeforeStart: func() {
 			if sleeper != nil {
 				sleeper.Release()
@@ -219,6 +235,11 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		Path: layout.File("metrics.json"),
 		Probe: func() metrics.Probe {
 			p := metrics.Probe{State: metrics.StateStopped, Players: tracker.Count()}
+			// With the plugin connected, its readings are the reference.
+			if s, ok := stream.Sample(); ok {
+				p.Players = s.Players
+				p.Plugin = &metrics.PluginSample{TPS: s.TPS, MSPT: s.MSPT, MSPTMax: s.MSPTMax, HeapMB: s.HeapMB}
+			}
 			switch st := process.Status(); {
 			case process.Active():
 				p.State, p.PID = metrics.StateRunning, st.PID
@@ -243,6 +264,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		Sleep:          sleeper,
 		HostWarnings:   hostChecks,
 		Metrics:        collector,
+		MetricsStream:  stream,
 		Console:        console,
 		Players:        tracker,
 		Commands:       commands,
@@ -295,6 +317,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		sleeper:     sleeper,
 		hostChecks:  hostChecks,
 		metrics:     collector,
+		stream:      stream,
 		logger:      logger,
 		handler:     handler,
 		controller:  controller,
@@ -389,6 +412,8 @@ func (a *app) startBackground(ctx context.Context) {
 	go a.updater.Run(ctx)
 	go a.sleeper.Run(ctx)
 	go a.metrics.Run(ctx)
+	a.stream.Reconcile()
+	go func() { <-ctx.Done(); a.stream.Close() }()
 	if err := a.ensureDefaultSave(); err != nil {
 		a.logger.Warn("could not create the default world", "error", err)
 	}

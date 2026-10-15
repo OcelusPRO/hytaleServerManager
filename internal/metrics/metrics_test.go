@@ -164,3 +164,37 @@ func TestContainerUsagePerState(t *testing.T) {
 		t.Fatalf("java average %v", a)
 	}
 }
+
+func TestSeriesAggregatesPluginReadings(t *testing.T) {
+	f := newFake()
+	c := f.collector("")
+	f.probe = Probe{State: StateRunning, Players: 2, Plugin: &PluginSample{TPS: 20, MSPT: 10, MSPTMax: 12, HeapMB: 1000}}
+	f.run(c, 5*time.Minute, 0)
+	f.probe.Plugin = &PluginSample{TPS: 10, MSPT: 30, MSPTMax: 80, HeapMB: 2000}
+	f.run(c, 5*time.Minute, 0)
+
+	s := c.Series(time.Hour)
+	if !s.PluginMetrics {
+		t.Fatal("plugin metrics not reported")
+	}
+	sum := s.Summary
+	if sum.AvgTPS == nil || *sum.AvgTPS < 14 || *sum.AvgTPS > 16 {
+		t.Errorf("avg TPS = %v", sum.AvgTPS)
+	}
+	if sum.MinTPS == nil || *sum.MinTPS != 10 || sum.PeakHeapMB == nil || *sum.PeakHeapMB != 2000 {
+		t.Errorf("min TPS = %v, peak heap = %v", sum.MinTPS, sum.PeakHeapMB)
+	}
+	last := s.Points[len(s.Points)-1]
+	if last.MSPTMax == nil || *last.MSPTMax != 80 {
+		t.Errorf("last point MSPT max = %v", last.MSPTMax)
+	}
+
+	// Without the plugin nothing is invented.
+	f2 := newFake()
+	c2 := f2.collector("")
+	f2.probe = Probe{State: StateRunning}
+	f2.run(c2, 2*time.Minute, 0)
+	if s2 := c2.Series(time.Hour); s2.PluginMetrics || s2.Summary.AvgTPS != nil {
+		t.Error("plugin data reported while the plugin is off")
+	}
+}

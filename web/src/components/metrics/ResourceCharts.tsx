@@ -6,6 +6,7 @@ import { formatMegabytes, formatSeconds } from "../../lib/format";
 import { getLang, translate as t, type MessageKey } from "../../lib/i18n";
 import type { MetricPoint, MetricsRange, MetricsSeries } from "../../lib/types";
 import { Card, CardHeader } from "../ui/Card";
+import { LiveResources, useStreamOverview } from "./LiveMetrics";
 
 const RANGES: MetricsRange[] = ["1h", "6h", "24h", "7d", "14d"];
 const RANGE_KEY = "hsm.metricsRange";
@@ -16,6 +17,7 @@ const REFRESH_MS = 5000;
 // (dark mode): Java process in yellow, whole container in violet.
 const JAVA = "#c98500";
 const CONTAINER = "#9085e9";
+const HEAP = "#199e70"; // JVM heap and tick measures, from the plugin
 const STATE_COLORS = { running: "#199e70", sleeping: "#3987e5", stopped: "#52525b" } as const;
 type State = keyof typeof STATE_COLORS;
 const STATES = Object.keys(STATE_COLORS) as State[];
@@ -281,18 +283,19 @@ function TimeAxis({ geometry: g }: { geometry: Geometry }) {
 function Figure({ label, value, hint, swatch }: { label: string; value: ReactNode; hint?: ReactNode; swatch?: string }) {
   return (
     <div className="min-w-0 rounded-lg bg-zinc-950/40 px-3 py-2.5 ring-1 ring-white/[0.04]">
-      <p className="flex items-center gap-1.5 truncate text-xs text-zinc-500">
-        {swatch && <span className="size-2 shrink-0 rounded-sm" style={{ background: swatch }} aria-hidden />}
+      <p className="flex items-start gap-1.5 text-xs leading-tight break-words text-zinc-500">
+        {swatch && <span className="mt-0.5 size-2 shrink-0 rounded-sm" style={{ background: swatch }} aria-hidden />}
         {label}
       </p>
       <p className="mt-0.5 truncate text-lg font-semibold tabular-nums text-zinc-100">{value}</p>
-      {hint && <p className="truncate text-xs text-zinc-500">{hint}</p>}
+      {hint && <p className="text-xs break-words text-zinc-500">{hint}</p>}
     </div>
   );
 }
 
 /** Resource history of the server: memory, CPU, players and states. */
-export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
+export function ResourceCharts({ maxMemoryMb, running }: { maxMemoryMb?: number; running: boolean }) {
+  const stream = useStreamOverview();
   const [range, setRange] = useState<MetricsRange>(loadRange);
   // The hovered point is followed by its time: points shift as new samples arrive.
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -350,6 +353,7 @@ export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
           </div>
         }
       />
+      {stream && <LiveResources overview={stream} running={running} />}
       <div className="grid grid-cols-1 gap-2 px-5 pt-4 sm:grid-cols-3">
         {STATES.map((s) => (
           <Figure
@@ -381,6 +385,14 @@ export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
         />
         <Figure label={t("features.charts.peakPlayers")} value={summary ? summary.peakPlayers : "—"} />
       </div>
+      {data?.pluginMetrics && summary && (
+        <div className="grid grid-cols-2 gap-2 px-5 pt-2 sm:grid-cols-4">
+          <Figure swatch={HEAP} label={t("features.charts.avgTps")} value={summary.avgTps !== undefined ? summary.avgTps.toFixed(1) : "—"} />
+          <Figure swatch={HEAP} label={t("features.charts.minTps")} value={summary.minTps !== undefined ? summary.minTps.toFixed(1) : "—"} />
+          <Figure swatch={HEAP} label={t("features.charts.avgMspt")} value={summary.avgMspt !== undefined ? `${summary.avgMspt.toFixed(1)} ms` : "—"} />
+          <Figure swatch={HEAP} label={t("features.charts.peakHeap")} value={summary.peakHeapMb !== undefined ? formatMegabytes(summary.peakHeapMb) : "—"} />
+        </div>
+      )}
       <div ref={ref} className="flex flex-col gap-4 px-5 pt-5 pb-4">
         {data && !data.processMetrics && <p className="text-xs text-zinc-500">{t("features.charts.linuxOnly")}</p>}
         {geometry && points.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">{t("features.charts.noData")}</p>}
@@ -396,6 +408,7 @@ export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
                   series={[
                     { label: container, color: CONTAINER, value: (p) => p.cmem },
                     { label: java, color: JAVA, value: (p) => p.memMb },
+                    ...(data?.pluginMetrics ? [{ label: t("features.charts.heap"), color: HEAP, value: (p: MetricPoint) => p.heapMb }] : []),
                   ]}
                   format={formatMegabytes}
                   hover={hover}
@@ -416,6 +429,36 @@ export function ResourceCharts({ maxMemoryMb }: { maxMemoryMb?: number }) {
                   hover={hover}
                   onHover={setHover}
                   minMax={100}
+                />
+              </>
+            )}
+            {data?.pluginMetrics && (
+              <>
+                <LineChart
+                  title={t("features.charts.tps")}
+                  points={points}
+                  geometry={geometry}
+                  series={[
+                    { label: t("features.charts.tpsShort"), color: HEAP, value: (p) => p.tps },
+                    { label: t("features.charts.minTps"), color: JAVA, value: (p) => p.tpsMin },
+                  ]}
+                  format={(v) => v.toFixed(1)}
+                  hover={hover}
+                  onHover={setHover}
+                  minMax={20}
+                />
+                <LineChart
+                  title={t("features.charts.mspt")}
+                  points={points}
+                  geometry={geometry}
+                  series={[
+                    { label: t("features.charts.msptShort"), color: HEAP, value: (p) => p.mspt },
+                    { label: "max", color: JAVA, value: (p) => p.msptMax },
+                  ]}
+                  format={(v) => `${v.toFixed(1)} ms`}
+                  hover={hover}
+                  onHover={setHover}
+                  minMax={50}
                 />
               </>
             )}

@@ -103,7 +103,7 @@ export function ModsPanel({ saveId, mods, inUse, onChange, onJob, jobVersion }: 
                   <Td>
                     <Checkbox checked={mod.enabled} onChange={(v) => toggle(mod, v)} label={t("worlds.mods.enable", { name: mod.fileName })} />
                   </Td>
-                  <Td>
+                  <Td className="max-sm:flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={mod.enabled ? "font-medium text-zinc-100" : "text-zinc-500 line-through"}>{mod.fileName}</span>
                       {mod.curseforge && (
@@ -115,9 +115,9 @@ export function ModsPanel({ saveId, mods, inUse, onChange, onJob, jobVersion }: 
                       )}
                     </div>
                   </Td>
-                  <Td className="text-right tabular-nums">{formatBytes(mod.sizeBytes)}</Td>
+                  <Td className="text-right tabular-nums max-sm:text-left">{formatBytes(mod.sizeBytes)}</Td>
                   <Td className="text-zinc-400 max-md:hidden">{formatDate(mod.modifiedAt)}</Td>
-                  <Td className="text-right whitespace-nowrap">
+                  <Td className="text-right whitespace-nowrap max-sm:ml-auto">
                     {updates.has(mod.fileName) && (
                       <Button size="sm" icon={ArrowUpCircle} onClick={() => update([mod.fileName])} title={t("worlds.mods.updateTo", { version: updates.get(mod.fileName)?.latest.displayName ?? "" })}>
                         {t("worlds.mods.update")}

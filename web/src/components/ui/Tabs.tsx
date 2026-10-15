@@ -8,7 +8,7 @@ interface TabsProps<T extends string> {
 
 export function Tabs<T extends string>({ value, onChange, items }: TabsProps<T>) {
   return (
-    <div className="flex gap-6 border-b border-white/[0.06] px-5" role="tablist">
+    <div className="flex flex-wrap gap-x-5 border-b border-white/[0.06] px-5 sm:gap-x-6" role="tablist">
       {items.map((item) => {
         const active = item.value === value;
         return (

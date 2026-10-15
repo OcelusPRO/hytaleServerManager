@@ -51,6 +51,17 @@ type Probe struct {
 	PID     int // 0 when the process is not running
 	State   string
 	Players int
+	// Plugin carries the readings of the MetricsStream plugin, when it is
+	// connected (nil otherwise).
+	Plugin *PluginSample
+}
+
+// PluginSample is what the MetricsStream plugin reports at sampling time.
+type PluginSample struct {
+	TPS     float64 // mean over the worlds, last 10 s
+	MSPT    float64 // mean milliseconds per tick
+	MSPTMax float64 // slowest world, peak of the last 10 s
+	HeapMB  float64 // JVM heap in use
 }
 
 // StateStat is the average usage of the container while the server was in
@@ -74,6 +85,15 @@ type Point struct {
 	ContainerMemMB    *float64 `json:"cmem,omitempty"`
 	ContainerMemMaxMB *float64 `json:"cmemMax,omitempty"`
 	Players           int      `json:"players"` // peak
+	// Readings of the MetricsStream plugin (absent while it is off): ticks
+	// per second (average and lowest), milliseconds per tick (average and
+	// peak), JVM heap in use (average and peak).
+	TPS       *float64 `json:"tps,omitempty"`
+	TPSMin    *float64 `json:"tpsMin,omitempty"`
+	MSPT      *float64 `json:"mspt,omitempty"`
+	MSPTMax   *float64 `json:"msptMax,omitempty"`
+	HeapMB    *float64 `json:"heapMb,omitempty"`
+	HeapMaxMB *float64 `json:"heapMaxMb,omitempty"`
 	// Seconds spent in each state during the period.
 	Running  float64 `json:"running"`
 	Sleeping float64 `json:"sleeping"`
@@ -95,6 +115,11 @@ type Summary struct {
 	ContainerAvgCPU    *float64             `json:"containerAvgCpu,omitempty"`
 	States             map[string]StateStat `json:"states,omitempty"`
 	PeakPlayers        int                  `json:"peakPlayers"`
+	// MetricsStream plugin: average and lowest TPS, average MSPT, peak heap.
+	AvgTPS     *float64 `json:"avgTps,omitempty"`
+	MinTPS     *float64 `json:"minTps,omitempty"`
+	AvgMSPT    *float64 `json:"avgMspt,omitempty"`
+	PeakHeapMB *float64 `json:"peakHeapMb,omitempty"`
 }
 
 // Series is a chart-ready history.
@@ -110,6 +135,8 @@ type Series struct {
 	ProcessMetrics bool `json:"processMetrics"`
 	// ContainerMetrics is true when the container's cgroup can be read.
 	ContainerMetrics bool `json:"containerMetrics"`
+	// PluginMetrics is true when the MetricsStream plugin contributed data.
+	PluginMetrics bool `json:"pluginMetrics"`
 }
 
 // Deps lists the collaborators of the Collector.
@@ -140,12 +167,16 @@ type Collector struct {
 
 // gauge accumulates the samples of one measure.
 type gauge struct {
-	sum, max float64
-	n        int
+	sum, min, max float64
+	n             int
 }
 
 func (g *gauge) add(v float64) {
+	if g.n == 0 {
+		g.min = v
+	}
 	g.sum += v
+	g.min = min(g.min, v)
 	g.max = max(g.max, v)
 	g.n++
 }
@@ -155,6 +186,13 @@ func (g gauge) avg() *float64 {
 		return nil
 	}
 	return ptr(round(g.sum / float64(g.n)))
+}
+
+func (g gauge) lowest() *float64 {
+	if g.n == 0 {
+		return nil
+	}
+	return ptr(round(g.min))
 }
 
 func (g gauge) peak() *float64 {
@@ -174,6 +212,8 @@ type minute struct {
 		ccpu, cmem gauge
 	}
 	players int
+	// MetricsStream plugin readings.
+	tps, mspt, msptMax, heap gauge
 }
 
 type cpuReading struct {
@@ -263,6 +303,12 @@ func (c *Collector) sample(elapsed time.Duration) {
 	st := &m.byState[stateIndex(probe.State)]
 	st.seconds += elapsed.Seconds()
 	m.players = max(m.players, probe.Players)
+	if pl := probe.Plugin; pl != nil {
+		m.tps.add(pl.TPS)
+		m.mspt.add(pl.MSPT)
+		m.msptMax.add(pl.MSPTMax)
+		m.heap.add(pl.HeapMB)
+	}
 	if procMemOK {
 		m.mem.add(procMem)
 	}
@@ -300,6 +346,8 @@ func (m minute) point() Point {
 		Running: m.byState[0].seconds, Sleeping: m.byState[1].seconds, Stopped: m.byState[2].seconds,
 		CPU: m.cpu.avg(), MemMB: m.mem.avg(), MemMaxMB: m.mem.peak(),
 		ContainerCPU: m.ccpu.avg(), ContainerMemMB: m.cmem.avg(), ContainerMemMaxMB: m.cmem.peak(),
+		TPS: m.tps.avg(), TPSMin: m.tps.lowest(), MSPT: m.mspt.avg(), MSPTMax: m.msptMax.peak(),
+		HeapMB: m.heap.avg(), HeapMaxMB: m.heap.peak(),
 	}
 	for i, s := range m.byState {
 		if s.ccpu.n > 0 || s.cmem.n > 0 {
@@ -367,6 +415,12 @@ func (c *Collector) Series(span time.Duration) Series {
 	}
 	flush()
 	s.Summary = summarize(minutes)
+	for _, p := range minutes {
+		if p.TPS != nil {
+			s.PluginMetrics = true
+			break
+		}
+	}
 	if s.Summary.ContainerAvgCPU != nil || s.Summary.ContainerPeakMemMB != nil {
 		s.ContainerMetrics = true
 	}
@@ -443,12 +497,38 @@ func merge(group []Point) Point {
 	out.CPU, out.MemMB = cpu.avg(), mem.avg()
 	out.ContainerCPU, out.ContainerMemMB = ccpu.avg(), cmem.avg()
 	out.States = stateStats(byState)
+	mergePlugin(&out, group)
 	return out
+}
+
+// mergePlugin aggregates the plugin readings of points into out: averages
+// weigh by the seconds the server ran, extremes are kept.
+func mergePlugin(out *Point, points []Point) {
+	var tps, mspt, heap weighted
+	for _, p := range points {
+		tps.add(p.TPS, p.Running)
+		mspt.add(p.MSPT, p.Running)
+		heap.add(p.HeapMB, p.Running)
+		out.TPSMin = minOf(out.TPSMin, p.TPSMin)
+		out.MSPTMax = maxOf(out.MSPTMax, p.MSPTMax)
+		out.HeapMaxMB = maxOf(out.HeapMaxMB, p.HeapMaxMB)
+	}
+	out.TPS, out.MSPT, out.HeapMB = tps.avg(), mspt.avg(), heap.avg()
+}
+
+func minOf(a, b *float64) *float64 {
+	if b == nil || (a != nil && *a <= *b) {
+		return a
+	}
+	return ptr(*b)
 }
 
 func summarize(points []Point) Summary {
 	p, cpu, _, ccpu, _, byState := combine(points)
+	var plugin Point
+	mergePlugin(&plugin, points)
 	return Summary{
+		AvgTPS: plugin.TPS, MinTPS: plugin.TPSMin, AvgMSPT: plugin.MSPT, PeakHeapMB: plugin.HeapMaxMB,
 		RunningSeconds:     p.Running,
 		SleepingSeconds:    p.Sleeping,
 		StoppedSeconds:     p.Stopped,

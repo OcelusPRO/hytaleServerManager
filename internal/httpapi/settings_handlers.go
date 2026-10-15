@@ -32,6 +32,9 @@ func (a *api) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, a.log, errBadRequest(err.Error()))
 		return
 	}
+	if a.deps.MetricsStream != nil {
+		a.deps.MetricsStream.Reconcile()
+	}
 	if updated.Patchline != previous.Patchline && a.deps.Provisioner != nil {
 		a.deps.Provisioner.Wake() // fetch the build of the new patchline now
 	}
