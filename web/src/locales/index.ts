@@ -3,6 +3,7 @@
 import * as common from "./sections/common";
 import * as configFields from "./sections/configFields";
 import * as console from "./sections/console";
+import * as errors from "./sections/errors";
 import * as features from "./sections/features";
 import * as hytale from "./sections/hytale";
 import * as pages from "./sections/pages";
@@ -16,6 +17,7 @@ export const en = {
   common: common.en,
   configFields: configFields.en,
   console: console.en,
+  errors: errors.en,
   features: features.en,
   hytale: hytale.en,
   pages: pages.en,
@@ -31,6 +33,7 @@ export const fr: Messages = {
   common: common.fr,
   configFields: configFields.fr,
   console: console.fr,
+  errors: errors.fr,
   features: features.fr,
   hytale: hytale.fr,
   pages: pages.fr,

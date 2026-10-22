@@ -1,12 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/feedback";
 import { usePolling } from "../../hooks/usePolling";
 import { api, seg } from "../../lib/api";
 import { formatBytes, formatDate, formatDuration, formatSeconds } from "../../lib/format";
-import { translate as t } from "../../lib/i18n";
-import type { OnlinePlayer, PlayerDetails, PlayersResponse, StreamPlayer, StreamVital } from "../../lib/types";
+import { translate as t, type MessageKey } from "../../lib/i18n";
+import type { PlayerActionRecord, PlayerDetails, PlayerRef, PlayerSession, PlayersResponse, StreamPlayer, StreamVital } from "../../lib/types";
 import { displayName, PlayerIdentity } from "./PlayerIdentity";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -31,8 +31,65 @@ const vital = (v: StreamVital) => `${Math.round(v.value)} / ${Math.round(v.max)}
 const ms = (v: number) => `${Math.round(v)} ms`;
 const yesNo = (v: boolean) => (v ? t("players.profile.yes") : t("players.profile.no"));
 
+/** Sessions shown before the "show all" button. */
+const SESSION_PREVIEW = 10;
+
+function SessionsSection({ sessions }: { sessions: PlayerSession[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? sessions : sessions.slice(0, SESSION_PREVIEW);
+  return (
+    <Section title={t("players.profile.sessions")}>
+      {sessions.length === 0 ? (
+        <p className="py-3 text-sm text-zinc-500">{t("players.profile.noSessions")}</p>
+      ) : (
+        <>
+          {shown.map((s) => (
+            <Row key={s.joinedAt} label={formatDate(s.joinedAt)}>
+              {s.leftAt
+                ? `→ ${formatDate(s.leftAt)} · ${formatSeconds((Date.parse(s.leftAt) - Date.parse(s.joinedAt)) / 1000)}`
+                : s.interrupted
+                  ? t("players.profile.sessionInterrupted")
+                  : t("players.profile.sessionOngoing")}
+              <span className="block text-xs text-zinc-500">
+                {s.name}
+                {s.saveId && ` · ${t("players.profile.sessionWorld", { id: s.saveId })}`}
+              </span>
+            </Row>
+          ))}
+          {!all && sessions.length > SESSION_PREVIEW && (
+            <button type="button" className="cursor-pointer py-2 text-xs text-brand-300 hover:text-brand-200" onClick={() => setAll(true)}>
+              {t("players.profile.moreSessions", { n: sessions.length })}
+            </button>
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
+
+function ActionsSection({ actions }: { actions: PlayerActionRecord[] }) {
+  return (
+    <Section title={t("players.profile.actions")}>
+      {actions.length === 0 ? (
+        <p className="py-3 text-sm text-zinc-500">{t("players.profile.noActions")}</p>
+      ) : (
+        actions.map((a, i) => (
+          <Row key={`${a.at}-${i}`} label={formatDate(a.at)}>
+            {t(`players.profile.action.${a.action}` as MessageKey)}{" "}
+            <Badge tone={a.source === "panel" ? "brand" : "neutral"}>
+              {a.source === "panel" ? t("players.profile.sourcePanel") : t("players.profile.sourceServer")}
+            </Badge>
+            {a.reason && <span className="block text-xs text-zinc-500">{a.reason}</span>}
+          </Row>
+        ))
+      )}
+    </Section>
+  );
+}
+
 interface PlayerDetailsDialogProps {
-  player: OnlinePlayer;
+  /** Online or only known: the online state comes from the roster. */
+  player: PlayerRef;
   /** Roster of the world: operators, whitelist and bans. */
   roster: PlayersResponse;
   /** Live data of the MetricsStream plugin; undefined while the plugin is off. */
@@ -48,6 +105,7 @@ export function PlayerDetailsDialog({ player, roster, stream, onClose }: PlayerD
   const whitelisted = roster.whitelist.players.some((p) => p.uuid.toLowerCase() === key);
   const ban = roster.bans.find((b) => b.player.uuid.toLowerCase() === key);
   const stored = data?.registered;
+  const online = roster.online.find((p) => p.uuid.toLowerCase() === key);
   const live = stream?.players.find((p) => p.uuid.toLowerCase() === key);
 
   return (
@@ -55,11 +113,22 @@ export function PlayerDetailsDialog({ player, roster, stream, onClose }: PlayerD
       <PlayerIdentity player={player} size="lg" />
 
       <Section title={t("players.profile.status")}>
-        <Row label={t("players.profile.online")}>
-          <Badge tone="success" dot pulse>
-            {t("players.profile.online")}
-          </Badge>{" "}
-          · {t("players.profile.connectedFor")} {formatDuration(player.joinedAt)}
+        <Row label={t("players.profile.status")}>
+          {online ? (
+            <>
+              <Badge tone="success" dot pulse>
+                {t("players.profile.online")}
+              </Badge>{" "}
+              · {t("players.profile.connectedFor")} {formatDuration(online.joinedAt)}
+            </>
+          ) : (
+            <>
+              <Badge tone="neutral" dot>
+                {t("players.profile.offline")}
+              </Badge>
+              {stored?.lastSeen && ` · ${t("players.profile.lastSeen")} ${formatDate(stored.lastSeen)}`}
+            </>
+          )}
         </Row>
         <Row label={t("players.profile.operator")}>{yesNo(isOp)}</Row>
         <Row label={t("players.profile.whitelisted")}>{yesNo(whitelisted)}</Row>
@@ -101,41 +170,46 @@ export function PlayerDetailsDialog({ player, roster, stream, onClose }: PlayerD
         )}
       </Section>
 
-      <Section title={t("players.profile.live")}>
-        {!stream ? (
-          <p className="py-3 text-sm text-zinc-500">{t("players.profile.liveOff")}</p>
-        ) : !live ? (
-          <p className="py-3 text-sm text-zinc-500">{t("players.profile.liveWaiting")}</p>
-        ) : (
-          <>
-            <Row label={t("players.profile.world")}>{live.world || "—"}</Row>
-            <Row label={t("players.profile.gameMode")}>{live.game_mode || "—"}</Row>
-            <Row label={t("players.profile.language")}>{live.language || "—"}</Row>
-            <Row label={t("players.profile.pingNow")}>{ms(live.ping_ms.last)}</Row>
-            <Row label={t("players.profile.pingAvg")}>{ms(live.ping_ms.avg)}</Row>
-            <Row label={t("players.profile.pingRange")}>
-              {ms(live.ping_ms.min)} / {ms(live.ping_ms.max)}
-            </Row>
-            <Row label={t("players.profile.position")}>
-              {live.position.x.toFixed(1)}, {live.position.y.toFixed(1)}, {live.position.z.toFixed(1)}
-            </Row>
-            <Row label={t("players.profile.orientation")}>
-              {live.position.yaw.toFixed(1)}° / {live.position.pitch.toFixed(1)}°
-            </Row>
-            <Row label={t("players.profile.health")}>{vital(live.vitals.health)}</Row>
-            <Row label={t("players.profile.stamina")}>{vital(live.vitals.stamina)}</Row>
-            <Row label={t("players.profile.mana")}>{vital(live.vitals.mana)}</Row>
-            <Row label={t("players.profile.oxygen")}>{vital(live.vitals.oxygen)}</Row>
-            <Row label={t("players.profile.sent")}>
-              {formatBytes(live.network.bytes_sent)} · {live.network.packets_sent.toLocaleString()} {t("players.profile.packetsSent").toLowerCase()}
-            </Row>
-            <Row label={t("players.profile.received")}>
-              {formatBytes(live.network.bytes_received)} · {live.network.packets_received.toLocaleString()} {t("players.profile.packetsReceived").toLowerCase()}
-            </Row>
-            <Row label={t("players.profile.queued")}>{live.network.queued_packets}</Row>
-          </>
-        )}
-      </Section>
+      {stored && <SessionsSection sessions={stored.sessions ?? []} />}
+      {stored && <ActionsSection actions={stored.actions ?? []} />}
+
+      {online && (
+        <Section title={t("players.profile.live")}>
+          {!stream ? (
+            <p className="py-3 text-sm text-zinc-500">{t("players.profile.liveOff")}</p>
+          ) : !live ? (
+            <p className="py-3 text-sm text-zinc-500">{t("players.profile.liveWaiting")}</p>
+          ) : (
+            <>
+              <Row label={t("players.profile.world")}>{live.world || "—"}</Row>
+              <Row label={t("players.profile.gameMode")}>{live.game_mode || "—"}</Row>
+              <Row label={t("players.profile.language")}>{live.language || "—"}</Row>
+              <Row label={t("players.profile.pingNow")}>{ms(live.ping_ms.last)}</Row>
+              <Row label={t("players.profile.pingAvg")}>{ms(live.ping_ms.avg)}</Row>
+              <Row label={t("players.profile.pingRange")}>
+                {ms(live.ping_ms.min)} / {ms(live.ping_ms.max)}
+              </Row>
+              <Row label={t("players.profile.position")}>
+                {live.position.x.toFixed(1)}, {live.position.y.toFixed(1)}, {live.position.z.toFixed(1)}
+              </Row>
+              <Row label={t("players.profile.orientation")}>
+                {live.position.yaw.toFixed(1)}° / {live.position.pitch.toFixed(1)}°
+              </Row>
+              <Row label={t("players.profile.health")}>{vital(live.vitals.health)}</Row>
+              <Row label={t("players.profile.stamina")}>{vital(live.vitals.stamina)}</Row>
+              <Row label={t("players.profile.mana")}>{vital(live.vitals.mana)}</Row>
+              <Row label={t("players.profile.oxygen")}>{vital(live.vitals.oxygen)}</Row>
+              <Row label={t("players.profile.sent")}>
+                {formatBytes(live.network.bytes_sent)} · {live.network.packets_sent.toLocaleString()} {t("players.profile.packetsSent").toLowerCase()}
+              </Row>
+              <Row label={t("players.profile.received")}>
+                {formatBytes(live.network.bytes_received)} · {live.network.packets_received.toLocaleString()} {t("players.profile.packetsReceived").toLowerCase()}
+              </Row>
+              <Row label={t("players.profile.queued")}>{live.network.queued_packets}</Row>
+            </>
+          )}
+        </Section>
+      )}
 
       <div className="mt-6 flex justify-end">
         <Button variant="ghost" onClick={onClose}>

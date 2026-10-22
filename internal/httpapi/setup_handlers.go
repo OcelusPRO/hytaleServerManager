@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"slices"
 
 	"hytale-server-manager/internal/settings"
 )
@@ -27,7 +26,7 @@ func (a *api) setupUpdate(w http.ResponseWriter, _ *http.Request) {
 
 // setupVersion freezes the game on a build (or follows the latest again
 // with an empty version) and switches to it now. Accepted builds are the
-// installed one, the stored ones (rollback) and the latest.
+// installed one and the latest: replaced builds are not kept.
 func (a *api) setupVersion(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Version string `json:"version"`
@@ -37,10 +36,9 @@ func (a *api) setupVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st := a.deps.Provisioner.Status()
-	known := body.Version == "" || body.Version == st.GameVersion ||
-		body.Version == st.LatestVersion || slices.Contains(st.StoredVersions, body.Version)
+	known := body.Version == "" || body.Version == st.GameVersion || body.Version == st.LatestVersion
 	if !known {
-		writeError(w, a.log, errBadRequest("unknown version: choose the installed version, a stored version or the latest"))
+		writeError(w, a.log, errBadRequest("unknown version: choose the installed version or the latest"))
 		return
 	}
 	needsSwitch := body.Version != st.GameVersion

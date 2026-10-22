@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"hytale-server-manager/internal/database"
 )
 
 const (
@@ -130,59 +132,90 @@ func TestOfflineEdits(t *testing.T) {
 	}
 }
 
-func TestRegistryTracksPlayers(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "registered_players.json")
-	reg, err := OpenRegistry(path)
+func newTestRegistry(t *testing.T, path string) *Registry {
+	t.Helper()
+	db, err := database.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { db.Close() })
+	return NewRegistry(db)
+}
+
+func mustPlayer(t *testing.T, r *Registry, uuid string) RegisteredPlayer {
+	t.Helper()
+	p, ok, err := r.Get(uuid)
+	if err != nil || !ok {
+		t.Fatalf("player %s: found %v, %v", uuid, ok, err)
+	}
+	return p
+}
+
+func TestRegistryTracksPlayers(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manager.db")
+	reg := newTestRegistry(t, path)
 	names := NewNameDirectory().WithRegistry(reg)
-	tr := NewTracker(names).WithRegistry(reg)
+	tr := NewTracker(names).WithRegistry(reg, func() string { return "world1" })
 	tr.Observe("[Universe|P] Adding player 'Ocelus (" + aliceUUID + ")")
 	tr.Observe("[Universe|P] Removing player 'Ocelus' (" + aliceUUID + ")")
 	tr.Observe("[Universe|P] Adding player 'Ocelus2 (" + aliceUUID + ")")
 	tr.Reset() // server stop closes the open session
 
-	reopened, err := OpenRegistry(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := reopened.All()[aliceUUID]
-	if p.LastKnownName != "Ocelus2" || len(p.PreviousNames) != 1 || p.PreviousNames[0] != "Ocelus" {
+	reopened := newTestRegistry(t, path)
+	p := mustPlayer(t, reopened, aliceUUID)
+	if p.LastKnownName != "Ocelus2" || len(p.PreviousNames) != 1 || p.PreviousNames[0] != "Ocelus" || len(p.Names) != 2 {
 		t.Errorf("names not tracked: %+v", p)
 	}
 	if p.ConnectionCount != 2 || p.FirstSeen.IsZero() || p.LastSeen.Before(p.FirstSeen) {
 		t.Errorf("activity not tracked: %+v", p)
 	}
+	if len(p.Sessions) != 2 || p.Sessions[0].Name != "Ocelus2" || p.Sessions[0].SaveID != "world1" || p.Sessions[0].LeftAt.IsZero() || p.Sessions[1].Interrupted {
+		t.Errorf("sessions not tracked: %+v", p.Sessions)
+	}
 	// A fresh directory resolves the name from the registry alone.
 	if ref := NewNameDirectory().WithRegistry(reopened).Resolver(t.TempDir())(aliceUUID); ref.Name != "Ocelus2" {
 		t.Errorf("registry fallback failed: %+v", ref)
 	}
+	if list, err := reopened.List(); err != nil || len(list) != 1 || list[0].Name != "Ocelus2" || list[0].ConnectionCount != 2 {
+		t.Errorf("List = %+v, %v", list, err)
+	}
+	if got := reopened.UUIDByName("ocelus2"); got != aliceUUID {
+		t.Errorf("UUIDByName = %q", got)
+	}
 }
 
-func TestRegistrySyncBansHistory(t *testing.T) {
-	reg, err := OpenRegistry(filepath.Join(t.TempDir(), "registered_players.json"))
-	if err != nil {
+func TestRegistryMarksInterruptedSessions(t *testing.T) {
+	reg := newTestRegistry(t, filepath.Join(t.TempDir(), "manager.db"))
+	t0 := time.Date(2026, 10, 22, 14, 0, 0, 0, time.UTC)
+	reg.Joined(aliceUUID, "Ocelus", "w", t0)
+	if err := reg.CloseInterrupted(); err != nil { // the manager restarted
 		t.Fatal(err)
 	}
-	t0 := time.Date(2026, 10, 12, 10, 0, 0, 0, time.UTC)
-	ban := Ban{Player: PlayerRef{UUID: bobUUID, Name: "Bob"}, Reason: "griefing", Timestamp: &t0}
-	for i := 0; i < 2; i++ { // idempotent
-		if err := reg.SyncBans([]Ban{ban}, t0.Add(time.Hour)); err != nil {
-			t.Fatal(err)
-		}
+	reg.Joined(aliceUUID, "Ocelus", "w", t0.Add(time.Hour))
+	reg.Left(aliceUUID, t0.Add(2*time.Hour), time.Hour)
+	s := mustPlayer(t, reg, aliceUUID).Sessions
+	if len(s) != 2 || !s[1].Interrupted || !s[1].LeftAt.IsZero() || s[0].Interrupted || !s[0].LeftAt.Equal(t0.Add(2*time.Hour)) {
+		t.Fatalf("sessions %+v", s)
 	}
-	h := reg.All()[bobUUID].BanHistory
-	if len(h) != 1 || h[0].Reason != "griefing" || !h[0].UnbannedAt.IsZero() {
-		t.Fatalf("ban not recorded: %+v", h)
+}
+
+func TestRegistryImportsLegacyJSON(t *testing.T) {
+	reg := newTestRegistry(t, filepath.Join(t.TempDir(), "manager.db"))
+	path := filepath.Join(t.TempDir(), "registered_players.json")
+	os.WriteFile(path, []byte(`{"`+aliceUUID+`":{"lastKnownName":"Ocelus","previousNames":["Old"],"firstSeen":"2026-10-14T22:35:16Z",
+		"lastSeen":"2026-10-22T13:59:00Z","connectionCount":7,"playtimeSeconds":2029,
+		"banHistory":[{"reason":"x","bannedAt":"2026-10-15T10:00:00Z","unbannedAt":"2026-10-16T10:00:00Z"}]}}`), 0o644)
+
+	n, err := reg.ImportJSON(path, "w1")
+	if err != nil || n != 1 {
+		t.Fatalf("imported %d, %v", n, err)
 	}
-	unban := t0.Add(48 * time.Hour)
-	_ = reg.SyncBans(nil, unban)
-	t1 := t0.Add(72 * time.Hour)
-	ban2 := Ban{Player: ban.Player, Reason: "again", Timestamp: &t1}
-	_ = reg.SyncBans([]Ban{ban2}, t1)
-	h = reg.All()[bobUUID].BanHistory
-	if len(h) != 2 || !h[0].UnbannedAt.Equal(unban) || h[1].Reason != "again" || !h[1].UnbannedAt.IsZero() {
-		t.Fatalf("history wrong: %+v", h)
+	p := mustPlayer(t, reg, aliceUUID)
+	if p.ConnectionCount != 7 || p.PlaytimeSeconds != 2029 || len(p.PreviousNames) != 1 || p.PreviousNames[0] != "Old" ||
+		len(p.BanHistory) != 1 || p.BanHistory[0].SaveID != "w1" || p.BanHistory[0].UnbannedAt.IsZero() {
+		t.Fatalf("imported player %+v", p)
+	}
+	if _, err := os.Stat(path + ".migrated"); err != nil {
+		t.Error(err)
 	}
 }

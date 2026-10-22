@@ -22,6 +22,10 @@ func (a *api) consoleHistory(w http.ResponseWriter, r *http.Request) {
 func (a *api) consoleStream(w http.ResponseWriter, r *http.Request) {
 	rc := http.NewResponseController(w)
 	since, _ := strconv.ParseUint(r.Header.Get("Last-Event-ID"), 10, 64)
+	token := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		token = c.Value
+	}
 
 	// Subscribe before reading history so that no line is missed.
 	lines, cancel := a.deps.Console.Subscribe()
@@ -49,6 +53,10 @@ func (a *api) consoleStream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-heartbeat.C:
+			// The session may have ended (logout, expiry) since the stream opened.
+			if !a.deps.Sessions.Active(token) {
+				return
+			}
 			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
 				return
 			}

@@ -47,7 +47,7 @@ var publicErrors = map[int][]error{
 		lifecycle.ErrHytaleAuthRequired, hytaleauth.ErrNotAuthenticated, hytaleauth.ErrNoProfile,
 		hytaleauth.ErrReauthRequired, players.ErrServerStopped, players.ErrNoActiveSave,
 		curseforge.ErrNoAPIKey, curseforge.ErrBusy, curseforge.ErrNoFile, curseforge.ErrNoModpacks,
-		curseforge.ErrGameNotFound, curseforge.ErrChecksum,
+		curseforge.ErrGameNotFound, curseforge.ErrChecksum, players.ErrUnknownPlayer,
 	},
 	http.StatusRequestEntityTooLarge: {saves.ErrModTooLarge, archive.ErrTooLarge},
 }

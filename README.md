@@ -57,6 +57,17 @@ depuis une interface web protégée par mot de passe (port 8080).
   vérifie le HMAC (secret généré dans `/data/manager/metrics-stream.key`),
   réassemble les fragments, décompresse et affiche le résultat sur le tableau
   de bord. Le port se change avec `HSM_METRICS_STREAM_PORT`.
+- **Rapports d'erreurs** : depuis la 0.7.3, le serveur envoie ses erreurs (et
+  celles des plugins tiers) au projet Sentry de la clé `SentryDsn` de son
+  `config.json`. Avec la destination « Le manager » (réglages), le
+  gestionnaire y écrit au démarrage un DSN pointant vers un petit point
+  d'entrée compatible Sentry sur `127.0.0.1:9878` ([`internal/errorreports`](internal/errorreports)) :
+  les erreurs sont regroupées par cause dans la page **Erreurs** (pile
+  d'appels, plugin, occurrences, résolution) et conservées dans
+  la base `/data/manager/manager.db`. Elles peuvent aussi être relayées telles
+  quelles vers votre propre projet Sentry (DSN optionnel). Le serveur les
+  envoie alors au gestionnaire au lieu d'Hypixel ; « Désactivés » lance le
+  serveur avec `--disable-sentry`.
 - **Passkeys** : connexion au panneau avec l'empreinte, le visage ou le code
   d'un appareil (WebAuthn, vérifié par la bibliothèque
   [go-webauthn](https://github.com/go-webauthn/webauthn)). Une fois une passkey
@@ -104,11 +115,12 @@ Les joueurs se connectent en **UDP 5520** (QUIC) : ouvrez/redirigez ce port en U
 | `HSM_TRUST_PROXY`     | `false` | Utiliser `X-Forwarded-For` pour l'anti-bruteforce |
 | `HSM_MAX_UPLOAD_MB`   | `1024`  | Taille max d'un mod ou d'une archive importée |
 | `HSM_METRICS_STREAM_PORT` | `9877` | Port UDP local du flux du plugin de métriques (optionnel) |
+| `HSM_ERROR_REPORTS_PORT` | `9878` | Port TCP local recevant les rapports d'erreurs du serveur |
 | `HSM_RESET_PASSWORD`  | `false` | Régénère le mot de passe et supprime les passkeys au démarrage (à retirer ensuite) |
 | `HSM_BINDHOOK_LIB`    | `/usr/local/lib/hsm-bindhook.so` | Bibliothèque d'interception du `bind()` (mise en veille) |
 | `HSM_SLEEP_TEST_WAKE_DELAY` | — | Test uniquement : retarde le démarrage après un réveil (ex. `90s`) pour mesurer la patience des clients |
 
-Mémoire Java, port de jeu, mode `offline`, cache AOT, Sentry, sauvegardes natives,
+Mémoire Java, port de jeu, mode `offline`, cache AOT, rapports d'erreurs, sauvegardes natives,
 démarrage/redémarrage automatique se règlent dans **Paramètres**.
 
 ### Mise en veille (désactivée par défaut)
@@ -169,7 +181,11 @@ ainsi la connexion du joueur comme s'il venait de l'accepter lui-même.
 ## Données (`/data`)
 
 ```
-manager/    secrets : hash du mot de passe, clé de chiffrement, jetons Hytale, réglages
+manager/    secrets : hash du mot de passe, clé de chiffrement, jetons Hytale, réglages (JSON)
+            manager.db : base SQLite des rapports d'erreurs et des joueurs
+            (profils, noms, sessions, bans, actions de modération) et
+            whitelist / bans / opérateurs partagés par tous les mondes :
+            appliqués par commandes console au démarrage de chaque monde
 runtime/    Java
 game/       Server/HytaleServer.jar, Assets.zip (remplacés atomiquement à chaque mise à jour)
 saves/<id>/ un dossier serveur par monde (répertoire de travail du serveur)

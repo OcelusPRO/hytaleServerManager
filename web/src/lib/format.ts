@@ -22,6 +22,28 @@ export function formatDate(value?: string): string {
   return value ? new Intl.DateTimeFormat(getLang(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 }
 
+/** Full date and time to the millisecond, to relate events together. */
+export function formatTimestamp(value?: string): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(getLang(), {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    fractionalSecondDigits: 3,
+  }).format(new Date(value));
+}
+
+/** A delay in seconds, with tenths under a minute ("3.7 s"). */
+export function formatDelay(seconds: number): string {
+  if (seconds < 60) {
+    return translate("common.units.seconds", { n: Math.max(0, seconds).toLocaleString(getLang(), { maximumFractionDigits: 1 }) });
+  }
+  return formatSeconds(seconds);
+}
+
 export function formatTime(value?: string): string {
   return value ? new Intl.DateTimeFormat(getLang(), { timeStyle: "medium" }).format(new Date(value)) : "";
 }

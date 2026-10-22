@@ -16,10 +16,10 @@ import { useStatus } from "../hooks/useStatus";
 import { api } from "../lib/api";
 import { formatDate } from "../lib/format";
 import { translate as t, useI18n, type Lang, type MessageKey } from "../lib/i18n";
-import type { AuthMode, Patchline, ServerSettings } from "../lib/types";
+import type { AuthMode, ErrorReporting, Patchline, ServerSettings } from "../lib/types";
 
 type NumberKey = "minMemoryMb" | "maxMemoryMb" | "port" | "stopTimeoutSeconds" | "nativeBackupMinutes";
-type BoolKey = "autoStart" | "autoRestart" | "useAotCache" | "nativeBackups" | "backupBeforeRestore" | "disableSentry" | "acceptEarlyPlugins" | "autosaveEnabled" | "autoUpdate" | "sleepEnabled" | "metricsStream";
+type BoolKey = "autoStart" | "autoRestart" | "useAotCache" | "nativeBackups" | "backupBeforeRestore" | "acceptEarlyPlugins" | "autosaveEnabled" | "autoUpdate" | "sleepEnabled" | "metricsStream";
 
 const NUMBERS: { key: NumberKey; label: MessageKey; hint?: MessageKey; min: number; max: number; step?: number }[] = [
   { key: "minMemoryMb", label: "settings.server.minMemory", hint: "settings.server.minMemoryHint", min: 256, max: 262144, step: 256 },
@@ -38,7 +38,6 @@ const BOOLEANS: { key: BoolKey; label: MessageKey; description: MessageKey }[] =
   { key: "sleepEnabled", label: "settings.behaviour.sleep", description: "settings.behaviour.sleepHint" },
   { key: "metricsStream", label: "settings.behaviour.metricsStream", description: "settings.behaviour.metricsStreamHint" },
   { key: "nativeBackups", label: "settings.behaviour.nativeBackups", description: "settings.behaviour.nativeBackupsHint" },
-  { key: "disableSentry", label: "settings.behaviour.disableSentry", description: "settings.behaviour.disableSentryHint" },
   { key: "acceptEarlyPlugins", label: "settings.behaviour.earlyPlugins", description: "settings.behaviour.earlyPluginsHint" },
 ];
 
@@ -158,6 +157,39 @@ function ServerSettingsForm({ initial, onSaved }: { initial: ServerSettings; onS
         </Card>
         {actions}
       </Section>
+
+      <Section title={t("settings.errorReports.title")} description={t("settings.errorReports.description")}>
+        <Card>
+          <CardBody className="flex flex-col gap-5">
+            <Field label={t("settings.errorReports.destination")} hint={t(`settings.errorReports.${form.errorReporting}Hint`)}>
+              {(id) => (
+                <Select id={id} className="sm:max-w-sm" value={form.errorReporting} onChange={(e) => set("errorReporting", e.target.value as ErrorReporting)}>
+                  <option value="hypixel">{t("settings.errorReports.hypixel")}</option>
+                  <option value="manager">{t("settings.errorReports.manager")}</option>
+                  <option value="off">{t("settings.errorReports.off")}</option>
+                </Select>
+              )}
+            </Field>
+            {form.errorReporting === "manager" && (
+              <Field label={t("settings.errorReports.forward")} hint={t("settings.errorReports.forwardHint")}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="url"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="https://…@o0.ingest.sentry.io/123"
+                    className="font-mono"
+                    value={form.sentryForwardDsn}
+                    onChange={(e) => set("sentryForwardDsn", e.target.value.trim())}
+                  />
+                )}
+              </Field>
+            )}
+          </CardBody>
+        </Card>
+        {actions}
+      </Section>
     </form>
   );
 }
@@ -192,16 +224,15 @@ function HytaleSection() {
   };
 
   const choice = wanted ?? setup.pinnedVersion;
-  const versions = [...new Set([setup.gameVersion, ...setup.storedVersions, setup.latestVersion].filter((v): v is string => !!v))];
+  // Replaced builds are not kept: only the installed and the latest one.
+  const versions = [...new Set([setup.gameVersion, setup.latestVersion].filter((v): v is string => !!v))];
   const changeVersion = async () => {
-    const rollback = choice !== "" && choice !== setup.gameVersion;
     const ok =
       server.state !== "running" ||
       (await confirm({
         title: choice === "" ? t("settings.updates.followTitle") : t("settings.updates.switchTitle", { version: choice }),
-        message: t("settings.updates.nowMessage") + (rollback ? t("settings.updates.rollbackWarning") : ""),
+        message: t("settings.updates.nowMessage"),
         confirmLabel: t("settings.updates.apply"),
-        danger: rollback,
       }));
     if (!ok) return;
     await run(() => api.post("/api/setup/version", { version: choice }), t("settings.updates.applied"));
@@ -269,7 +300,7 @@ function HytaleSection() {
           <CardBody className="flex flex-wrap items-end justify-between gap-4 border-t border-white/[0.06]">
             <Field
               label={t("settings.updates.version")}
-              hint={setup.pinnedVersion ? t("settings.updates.pinned", { version: setup.pinnedVersion }) : t("settings.updates.keptVersions")}
+              hint={setup.pinnedVersion ? t("settings.updates.pinned", { version: setup.pinnedVersion }) : t("settings.updates.noRollback")}
             >
               {(id) => (
                 <Select id={id} value={choice} onChange={(e) => setWanted(e.target.value)}>
@@ -277,11 +308,7 @@ function HytaleSection() {
                   {versions.map((v) => (
                     <option key={v} value={v}>
                       {v}
-                      {v === setup.gameVersion
-                        ? t("settings.updates.installedSuffix")
-                        : setup.storedVersions.includes(v)
-                          ? t("settings.updates.storedSuffix")
-                          : t("settings.updates.latestSuffix")}
+                      {v === setup.gameVersion ? t("settings.updates.installedSuffix") : t("settings.updates.latestSuffix")}
                     </option>
                   ))}
                 </Select>

@@ -108,8 +108,6 @@ export interface SetupStatus {
   updateAvailable: boolean;
   /** Build the game is frozen on, empty when following the latest. */
   pinnedVersion: string;
-  /** Previous builds available for rollback, newest first. */
-  storedVersions: string[];
   waitingForAccount: boolean;
   activity: SetupActivity;
   /** Completed fraction of the activity, -1 when unknown. */
@@ -248,6 +246,14 @@ export interface PlayerRef {
   name: string;
 }
 
+/** A player the manager has seen, connected or not. */
+export interface KnownPlayer extends PlayerRef {
+  firstSeen?: string;
+  lastSeen?: string;
+  connectionCount: number;
+  playtimeSeconds: number;
+}
+
 export interface BanEntry {
   player: PlayerRef;
   by?: PlayerRef;
@@ -263,12 +269,15 @@ export interface PlayersResponse {
   whitelist: { enabled: boolean; players: PlayerRef[] };
   bans: BanEntry[];
   operators: PlayerRef[];
+  /** Players of the shared lists not applied to the active world yet (at its next boot). */
+  pending?: { bans: string[] | null; operators: string[] | null; whitelist: string[] | null };
 }
 
 export type AccessList = "bans" | "operators" | "whitelist";
 
 export type AuthMode = "authenticated" | "offline";
 export type Patchline = "release" | "pre-release";
+export type ErrorReporting = "hypixel" | "manager" | "off";
 
 export interface ServerSettings {
   activeSaveId: string;
@@ -278,7 +287,6 @@ export interface ServerSettings {
   patchline: Patchline;
   authMode: AuthMode;
   useAotCache: boolean;
-  disableSentry: boolean;
   autoStart: boolean;
   autoRestart: boolean;
   nativeBackups: boolean;
@@ -295,6 +303,8 @@ export interface ServerSettings {
   sleepEnabled: boolean;
   sleepIdleMinutes: number;
   metricsStream: boolean;
+  errorReporting: ErrorReporting;
+  sentryForwardDsn: string;
   gameLanguage: "en" | "fr";
   gameVersionPin: string;
 }
@@ -357,7 +367,32 @@ export interface StoredPlayer {
   lastSeen?: string;
   connectionCount: number;
   playtimeSeconds: number;
-  banHistory?: { reason?: string; bannedAt: string; expiresOn?: string; unbannedAt?: string }[];
+  banHistory?: { reason?: string; saveId?: string; bannedAt: string; expiresOn?: string; unbannedAt?: string }[];
+  /** Names used, oldest first. */
+  names?: { name: string; firstSeen?: string; lastSeen?: string }[];
+  /** Latest connections, newest first. */
+  sessions?: PlayerSession[];
+  /** Latest moderation actions, newest first. */
+  actions?: PlayerActionRecord[];
+}
+
+export interface PlayerSession {
+  name: string;
+  saveId?: string;
+  joinedAt: string;
+  leftAt?: string;
+  /** The manager stopped during the session: its end is unknown. */
+  interrupted?: boolean;
+}
+
+export interface PlayerActionRecord {
+  name?: string;
+  action: PlayerAction;
+  reason?: string;
+  saveId?: string;
+  /** panel: made from this interface; server: found in the world's files. */
+  source: "panel" | "server";
+  at: string;
 }
 
 export interface PlayerDetails {
@@ -411,4 +446,92 @@ export interface StreamEvent {
   kind: "event";
   timeMs: number;
   data?: Record<string, unknown>;
+}
+
+/** Error reports of the server (see internal/errorreports). */
+export type ErrorLevel = "fatal" | "error" | "warning" | "info" | "debug";
+
+export interface ErrorIssueSummary {
+  id: string;
+  title: string;
+  culprit?: string;
+  plugin?: string;
+  level: ErrorLevel | string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  resolved: boolean;
+  /** Seen again after being resolved. */
+  regressed?: boolean;
+  resolvedAt?: string;
+}
+
+export interface ErrorFrame {
+  module?: string;
+  function?: string;
+  filename?: string;
+  line?: number;
+  inApp?: boolean;
+}
+
+export interface ErrorException {
+  type: string;
+  value?: string;
+  module?: string;
+  frames?: ErrorFrame[];
+}
+
+export interface ErrorEvent {
+  id: string;
+  time: string;
+  level: string;
+  logger?: string;
+  message?: string;
+  release?: string;
+  environment?: string;
+  serverName?: string;
+  /** The cause first, the exception finally thrown last. */
+  exceptions?: ErrorException[];
+  tags?: Record<string, string>;
+  raw?: unknown;
+  rawDropped?: boolean;
+}
+
+/** One appearance of an error. */
+export interface ErrorOccurrence {
+  time: string;
+  eventId?: string;
+  message?: string;
+  release?: string;
+  /** Start of the server process that raised it. */
+  launch?: string;
+}
+
+export interface ErrorIssue extends ErrorIssueSummary {
+  last: ErrorEvent;
+  /** Oldest first, the latest ones only. */
+  occurrences: ErrorOccurrence[];
+}
+
+export interface ErrorForwardStatus {
+  sent: number;
+  failed: number;
+  dropped: number;
+  lastSentAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+}
+
+export interface ErrorReportsOverview {
+  status: {
+    enabled: boolean;
+    loaded: boolean;
+    listening: boolean;
+    port: number;
+    error?: string;
+    received: number;
+    rejected: number;
+    forward?: ErrorForwardStatus;
+  };
+  issues: ErrorIssueSummary[];
 }

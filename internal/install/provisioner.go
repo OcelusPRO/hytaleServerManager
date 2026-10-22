@@ -41,9 +41,8 @@ type Status struct {
 	LatestVersion   string `json:"latestVersion,omitempty"`
 	UpdateAvailable bool   `json:"updateAvailable"`
 	// PinnedVersion is the build the operator froze the game on ("" = follow
-	// the latest). StoredVersions can be rolled back to without downloading.
+	// the latest).
 	PinnedVersion     string   `json:"pinnedVersion"`
-	StoredVersions    []string `json:"storedVersions"`
 	WaitingForAccount bool     `json:"waitingForAccount"`
 	Activity          Activity `json:"activity"`
 	// Progress is the completed fraction of the activity, or -1 if unknown.
@@ -162,7 +161,6 @@ func (p *Provisioner) Status() Status {
 		LatestVersion:     p.latest,
 		UpdateAvailable:   pin == "" && gameReady && p.latest != "" && p.latest != gameVersion,
 		PinnedVersion:     pin,
-		StoredVersions:    p.game.Stored(),
 		WaitingForAccount: !gameReady && !accountReady,
 		Activity:          p.activity,
 		Progress:          p.progress,
@@ -250,21 +248,9 @@ func (p *Provisioner) installLatest(ctx context.Context) {
 	}
 	p.begin(ActivityChecking, -1)
 	pin := p.pinned()
-	if _, installed := p.game.Files(); installed && pin != "" {
-		switch {
-		case p.game.Version() == pin:
-			p.succeed()
-			return
-		case p.game.HasStored(pin):
-			p.begin(ActivityExtracting, -1)
-			p.logger.Info("switching game build", "version", pin)
-			if err := p.game.Activate(pin); err != nil {
-				p.fail(err)
-				return
-			}
-			p.succeed()
-			return
-		}
+	if _, installed := p.game.Files(); installed && pin != "" && p.game.Version() == pin {
+		p.succeed()
+		return
 	}
 	m, err := p.latestManifest(ctx)
 	if err != nil {
@@ -272,7 +258,7 @@ func (p *Provisioner) installLatest(ctx context.Context) {
 		return
 	}
 	if pin != "" && m.Version != pin {
-		p.fail(fmt.Errorf("version %s is not stored and can no longer be downloaded (latest version: %s)", pin, m.Version))
+		p.fail(fmt.Errorf("version %s is not installed and can no longer be downloaded (latest version: %s)", pin, m.Version))
 		return
 	}
 	if _, installed := p.game.Files(); installed && m.Version == p.game.Version() {

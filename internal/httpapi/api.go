@@ -39,6 +39,7 @@ type Deps struct {
 	HostWarnings   hostWarnings
 	Metrics        metricsSource // optional
 	MetricsStream  metricsStream // optional
+	ErrorReports   errorReports  // optional
 	Console        *gameserver.Console
 	Players        *players.Tracker
 	PlayerAccess   *players.Service
@@ -95,6 +96,9 @@ func NewHandler(deps Deps) http.Handler {
 	a.routeMetrics(private)
 	if deps.MetricsStream != nil {
 		a.routeMetricsStream(private)
+	}
+	if deps.ErrorReports != nil {
+		a.routeErrorReports(private)
 	}
 	a.routeCurseForge(private)
 	if deps.Passkeys != nil {

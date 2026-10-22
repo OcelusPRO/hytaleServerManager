@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"hytale-server-manager/internal/archive"
@@ -20,6 +22,8 @@ import (
 	"hytale-server-manager/internal/commandcatalog"
 	"hytale-server-manager/internal/config"
 	"hytale-server-manager/internal/curseforge"
+	"hytale-server-manager/internal/database"
+	"hytale-server-manager/internal/errorreports"
 	"hytale-server-manager/internal/fsutil"
 	"hytale-server-manager/internal/gameserver"
 	"hytale-server-manager/internal/hostcheck"
@@ -64,12 +68,21 @@ type app struct {
 	hostChecks  *hostcheck.Monitor
 	metrics     *metrics.Collector
 	stream      *metricsstream.Service
+	reports     *errorreports.Service
+	db          *sql.DB
 }
 
 func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 	layout := paths.New(cfg.DataDir)
 	if err := layout.EnsureAll(); err != nil {
 		return nil, err
+	}
+	removed, err := layout.CleanStale()
+	for _, path := range removed {
+		logger.Info("removed a leftover file", "path", path)
+	}
+	if err != nil {
+		logger.Warn("could not remove every leftover file", "error", err)
 	}
 	if err := ensureMachineID(layout.MachineIDFile()); err != nil {
 		logger.Warn("could not create the machine id", "error", err)
@@ -94,6 +107,10 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 	if err != nil {
 		return nil, err
 	}
+	db, err := database.OpenWithBackup(layout.File("manager.db"), logger)
+	if err != nil {
+		return nil, err
+	}
 	hytaleAPI := hytaleapi.NewClient(&http.Client{Timeout: 30 * time.Second}, hytaleapi.DefaultEndpoints())
 	box, err := secretbox.LoadOrCreate(layout.File("secret.key"))
 	if err != nil {
@@ -106,18 +123,23 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 
 	console := gameserver.NewConsole(consoleHistoryLines)
 	process := gameserver.NewProcess(console)
-	registry, err := players.OpenRegistry(layout.File("registered_players.json"))
-	if err != nil {
+	registry := players.NewRegistry(db)
+	if n, err := registry.ImportJSON(layout.File("registered_players.json"), settingsStore.Get().ActiveSaveID); err != nil {
+		return nil, fmt.Errorf("import the players: %w", err)
+	} else if n > 0 {
+		logger.Info("players moved to the database", "count", n)
+	}
+	if err := registry.CloseInterrupted(); err != nil {
 		return nil, err
 	}
 	names := players.NewNameDirectory().WithRegistry(registry)
-	tracker := players.NewTracker(names).WithRegistry(registry)
+	tracker := players.NewTracker(names).WithRegistry(registry, func() string { return process.Status().SaveID })
 	process.OnExit(func(gameserver.ExitInfo) { tracker.Reset() })
 
 	fetcher := install.NewFetcher(&http.Client{Timeout: 3 * time.Hour})
 	provisioner := install.NewProvisioner(install.ProvisionerDeps{
 		Java:          install.NewJavaRuntime(layout.JavaDir(), layout.TmpDir(), fetcher),
-		Game:          install.NewGameInstall(layout.GameDir(), layout.GameVersionsDir(), layout.TmpDir(), hytaleAPI, hytaleAuth.AccessToken, fetcher),
+		Game:          install.NewGameInstall(layout.GameDir(), layout.TmpDir(), hytaleAPI, hytaleAuth.AccessToken, fetcher),
 		AccountReady:  hytaleAuth.Ready,
 		ServerRunning: process.Active,
 		Patchline:     func() string { return settingsStore.Get().Patchline },
@@ -140,17 +162,40 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		},
 		Logger: logger,
 	})
+	reports, err := errorreports.New(errorreports.Deps{
+		KeyPath: layout.File("error-reports.key"),
+		DB:      db,
+		Port:    cfg.ErrorReportsPort,
+		Enabled: func() bool { return settingsStore.Get().ErrorReporting == settings.ErrorReportingManager },
+		ForwardDSN: func() string {
+			if st := settingsStore.Get(); st.ErrorReporting == settings.ErrorReportingManager {
+				return st.SentryForwardDSN
+			}
+			return ""
+		},
+		Logger: logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if n, err := reports.Store().ImportJSON(layout.File("error-reports.json")); err != nil {
+		return nil, fmt.Errorf("import the error reports: %w", err)
+	} else if n > 0 {
+		logger.Info("error reports moved to the database", "count", n)
+	}
 	var sleeper *sleep.Sleeper // needs the controller, which must free its port
 	hookSocket := bindHookSocket(cfg, layout)
 	controller := lifecycle.New(lifecycle.Deps{
-		Process:     process,
-		Console:     console,
-		Settings:    settingsStore,
-		Saves:       saveStore,
-		Install:     provisioner,
-		Auth:        hytaleAuth,
-		HomeDir:     layout.HomeDir(),
-		PrepareSave: stream.Prepare,
+		Process:  process,
+		Console:  console,
+		Settings: settingsStore,
+		Saves:    saveStore,
+		Install:  provisioner,
+		Auth:     hytaleAuth,
+		HomeDir:  layout.HomeDir(),
+		PrepareSave: func(saveDir string) error {
+			return errors.Join(stream.Prepare(saveDir), reports.Prepare(saveDir))
+		},
 		BeforeStart: func() {
 			if sleeper != nil {
 				sleeper.Release()
@@ -199,7 +244,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		id := settingsStore.Get().ActiveSaveID
 		dir, err := saveStore.Dir(id)
 		return id, dir, err
-	}).WithRegistry(registry)
+	}).WithRegistry(registry, players.NewSharedLists(db))
 
 	commands := commandcatalog.NewService(commandcatalog.Deps{
 		Builder: commandcatalog.NewBuilder(process, console),
@@ -265,6 +310,7 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		HostWarnings:   hostChecks,
 		Metrics:        collector,
 		MetricsStream:  stream,
+		ErrorReports:   reports,
 		Console:        console,
 		Players:        tracker,
 		Commands:       commands,
@@ -318,6 +364,8 @@ func buildApp(cfg config.Config, logger *slog.Logger) (*app, error) {
 		hostChecks:  hostChecks,
 		metrics:     collector,
 		stream:      stream,
+		reports:     reports,
+		db:          db,
 		logger:      logger,
 		handler:     handler,
 		controller:  controller,
@@ -407,11 +455,12 @@ func (a *app) startBackground(ctx context.Context) {
 	go a.provisioner.Run(ctx)
 	go a.commands.Watch(ctx)
 	go a.followConsole(ctx)
-	go a.followBans(ctx)
+	go a.followAccess(ctx)
 	go a.autosave(ctx)
 	go a.updater.Run(ctx)
 	go a.sleeper.Run(ctx)
 	go a.metrics.Run(ctx)
+	go a.reports.Run(ctx)
 	a.stream.Reconcile()
 	go func() { <-ctx.Done(); a.stream.Close() }()
 	if err := a.ensureDefaultSave(); err != nil {
@@ -505,19 +554,39 @@ func (a *app) followConsole(ctx context.Context) {
 				a.tracker.Observe(l.Text)
 				a.sleeper.ObserveLine(l.Text)
 				a.hostChecks.Observe(l.Text)
+				if strings.Contains(l.Text, serverBootedLine) {
+					go a.applySharedAccess()
+				}
 			}
 		}
 	}
 }
 
-// followBans records ban and unban dates in the player registry, including
-// those made from the server console, by comparing bans.json periodically.
-func (a *app) followBans(ctx context.Context) {
+// serverBootedLine is printed by the server once it accepts commands.
+const serverBootedLine = "Hytale Server Booted!"
+
+// applySharedAccess brings the world that just booted in line with the
+// shared whitelist, bans and operators.
+func (a *app) applySharedAccess() {
+	sent, err := a.playerSvc.Reconcile()
+	if sent > 0 {
+		a.console.System(fmt.Sprintf("Shared whitelist, bans and operators applied to this world (%d change(s)).", sent))
+	}
+	if err != nil {
+		a.console.System("Could not apply the shared whitelist, bans and operators: " + err.Error())
+		a.logger.Warn("shared access lists not applied", "error", err)
+	}
+}
+
+// followAccess takes the changes of the active world's whitelist, bans and
+// operators (including those made from the game console) into the shared
+// lists, by comparing its files periodically.
+func (a *app) followAccess(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
-		if err := a.playerSvc.SyncBans(); err != nil && !errors.Is(err, players.ErrNoActiveSave) {
-			a.logger.Warn("ban history sync failed", "error", err)
+		if err := a.playerSvc.Sync(); err != nil && !errors.Is(err, players.ErrNoActiveSave) {
+			a.logger.Warn("access lists sync failed", "error", err)
 		}
 		select {
 		case <-ctx.Done():
@@ -529,6 +598,8 @@ func (a *app) followBans(ctx context.Context) {
 
 // shutdown stops the game server gracefully before the manager exits.
 func (a *app) shutdown() {
+	// Last: the server's final disconnections are recorded in it.
+	defer a.db.Close()
 	if !a.controller.Running() {
 		return
 	}

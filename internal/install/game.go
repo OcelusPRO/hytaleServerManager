@@ -7,10 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"strings"
-	"time"
 
 	"hytale-server-manager/internal/archive"
 	"hytale-server-manager/internal/fsutil"
@@ -20,17 +17,7 @@ import (
 const (
 	versionFile  = "version.txt"
 	maxGameBytes = 20 << 30
-	// keptVersions is how many replaced builds stay available for rollback.
-	keptVersions = 3
 )
-
-// ValidVersion reports whether v is usable as a stored build name.
-func ValidVersion(v string) bool { return versionPattern.MatchString(v) }
-
-var versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$`)
-
-// ErrVersionNotStored is returned when a rollback target is not available locally.
-var ErrVersionNotStored = errors.New("this version is not stored locally")
 
 // GameFiles points at the files needed to launch the server.
 type GameFiles struct {
@@ -51,18 +38,17 @@ type TokenSource func(ctx context.Context) (string, error)
 // GameInstall downloads the server binaries and assets directly from the
 // Hytale asset service, exactly like the server's built-in updater.
 type GameInstall struct {
-	dir         string
-	versionsDir string
-	tmpDir      string
-	api         assetAPI
-	token       TokenSource
-	fetch       *Fetcher
+	dir    string
+	tmpDir string
+	api    assetAPI
+	token  TokenSource
+	fetch  *Fetcher
 }
 
-// NewGameInstall manages the game files in dir.
-// Replaced builds are kept in versionsDir.
-func NewGameInstall(dir, versionsDir, tmpDir string, api assetAPI, token TokenSource, fetch *Fetcher) *GameInstall {
-	return &GameInstall{dir: dir, versionsDir: versionsDir, tmpDir: tmpDir, api: api, token: token, fetch: fetch}
+// NewGameInstall manages the game files in dir. A replaced build is
+// deleted: only the installed one is kept (a build takes several GB).
+func NewGameInstall(dir, tmpDir string, api assetAPI, token TokenSource, fetch *Fetcher) *GameInstall {
+	return &GameInstall{dir: dir, tmpDir: tmpDir, api: api, token: token, fetch: fetch}
 }
 
 // Files returns the installed game files.
@@ -133,71 +119,6 @@ func (g *GameInstall) Install(ctx context.Context, m hytaleapi.Manifest, onProgr
 	return g.swapIn(root)
 }
 
-// Stored lists the previous builds available for rollback, newest first.
-func (g *GameInstall) Stored() []string {
-	entries, err := os.ReadDir(g.versionsDir)
-	if err != nil {
-		return nil
-	}
-	type build struct {
-		name string
-		at   time.Time
-	}
-	var builds []build
-	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil || !e.IsDir() || !ValidVersion(e.Name()) || !completeBuild(filepath.Join(g.versionsDir, e.Name())) {
-			continue
-		}
-		builds = append(builds, build{e.Name(), info.ModTime()})
-	}
-	slices.SortFunc(builds, func(a, b build) int { return b.at.Compare(a.at) })
-	names := make([]string, len(builds))
-	for i, b := range builds {
-		names[i] = b.name
-	}
-	return names
-}
-
-// HasStored reports whether version can be activated without downloading.
-func (g *GameInstall) HasStored(version string) bool {
-	return ValidVersion(version) && slices.Contains(g.Stored(), version)
-}
-
-// Activate switches the installed game to a stored build. The build it
-// replaces is stored in turn, so the switch can be undone.
-func (g *GameInstall) Activate(version string) error {
-	if !g.HasStored(version) {
-		return ErrVersionNotStored
-	}
-	return g.swapIn(filepath.Join(g.versionsDir, version))
-}
-
-// archive stores a replaced build for later rollback, or deletes it when it
-// cannot be identified.
-func (g *GameInstall) archive(dir, replacedBy string) {
-	name := readVersion(dir)
-	if name == "" || name == replacedBy || !ValidVersion(name) || !completeBuild(dir) {
-		_ = os.RemoveAll(dir)
-		return
-	}
-	dest := filepath.Join(g.versionsDir, name)
-	if err := os.MkdirAll(g.versionsDir, 0o750); err != nil {
-		_ = os.RemoveAll(dir)
-		return
-	}
-	_ = os.RemoveAll(dest)
-	if err := os.Rename(dir, dest); err != nil {
-		_ = os.RemoveAll(dir)
-		return
-	}
-	now := time.Now()
-	_ = os.Chtimes(dest, now, now) // storage order = replacement order
-	for _, stale := range g.Stored()[min(keptVersions, len(g.Stored())):] {
-		_ = os.RemoveAll(filepath.Join(g.versionsDir, stale))
-	}
-}
-
 func completeBuild(root string) bool {
 	return fsutil.Exists(filepath.Join(root, "Assets.zip")) &&
 		fsutil.Exists(filepath.Join(root, "Server", "HytaleServer.jar"))
@@ -211,7 +132,8 @@ func readVersion(root string) string {
 	return strings.TrimSpace(string(data))
 }
 
-// swapIn atomically replaces the game directory with newRoot.
+// swapIn atomically replaces the game directory with newRoot, then
+// deletes the replaced build.
 func (g *GameInstall) swapIn(newRoot string) error {
 	old := g.dir + ".old"
 	if err := os.RemoveAll(old); err != nil {
@@ -226,8 +148,7 @@ func (g *GameInstall) swapIn(newRoot string) error {
 		_ = os.Rename(old, g.dir) // roll back
 		return err
 	}
-	g.archive(old, readVersion(g.dir))
-	return nil
+	return os.RemoveAll(old)
 }
 
 // findGameRoot finds the directory holding Assets.zip and Server/.

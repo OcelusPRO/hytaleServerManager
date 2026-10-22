@@ -6,6 +6,7 @@ export const en = {
     console: "Console",
     worlds: "Worlds",
     players: "Players",
+    errors: "Errors",
     settings: "Settings",
   },
   states: {
@@ -51,6 +52,7 @@ export const fr: Shape<typeof en> = {
     console: "Console",
     worlds: "Mondes",
     players: "Joueurs",
+    errors: "Erreurs",
     settings: "Paramètres",
   },
   states: {

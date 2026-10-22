@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sync"
 
+	"hytale-server-manager/internal/errorreports"
 	"hytale-server-manager/internal/fsutil"
 )
 
@@ -24,6 +25,18 @@ const (
 	PatchlinePreRelease = "pre-release"
 )
 
+// Destinations of the server's error reports (Sentry).
+const (
+	// ErrorReportingHypixel leaves the server's own configuration alone:
+	// reports go to Hypixel.
+	ErrorReportingHypixel = "hypixel"
+	// ErrorReportingManager points the server to the manager, which shows
+	// the errors and can relay them to SentryForwardDSN.
+	ErrorReportingManager = "manager"
+	// ErrorReportingOff starts the server with --disable-sentry.
+	ErrorReportingOff = "off"
+)
+
 // Settings configures how the game server is launched.
 type Settings struct {
 	ActiveSaveID        string `json:"activeSaveId"`
@@ -33,7 +46,6 @@ type Settings struct {
 	Patchline           string `json:"patchline"`
 	AuthMode            string `json:"authMode"`
 	UseAOTCache         bool   `json:"useAotCache"`
-	DisableSentry       bool   `json:"disableSentry"`
 	AutoStart           bool   `json:"autoStart"`
 	AutoRestart         bool   `json:"autoRestart"`
 	NativeBackups       bool   `json:"nativeBackups"`
@@ -59,6 +71,12 @@ type Settings struct {
 	// and receives its metrics stream (see internal/metricsstream). Off by
 	// default: nothing is added to the server unless the operator opts in.
 	MetricsStream bool `json:"metricsStream"`
+	// ErrorReporting is where the server sends its error reports, one of
+	// the ErrorReporting constants.
+	ErrorReporting string `json:"errorReporting"`
+	// SentryForwardDSN, optional, relays the reports received by the manager
+	// to a Sentry project of the operator.
+	SentryForwardDSN string `json:"sentryForwardDsn"`
 	// GameLanguage is the language of the announcements shown to players
 	// in game (automatic updates).
 	GameLanguage string `json:"gameLanguage"`
@@ -76,7 +94,6 @@ func Defaults() Settings {
 		Patchline:           PatchlineRelease,
 		AuthMode:            AuthModeAuthenticated,
 		UseAOTCache:         true,
-		DisableSentry:       false,
 		AutoStart:           false,
 		AutoRestart:         true,
 		NativeBackups:       false,
@@ -93,6 +110,7 @@ func Defaults() Settings {
 		SleepEnabled:     false,
 		SleepIdleMinutes: 10,
 		GameLanguage:     "en",
+		ErrorReporting:   ErrorReportingHypixel,
 	}
 }
 
@@ -117,9 +135,16 @@ func (s Settings) Validate() error {
 	check(s.AutoUpdateIdleMinutes >= 1 && s.AutoUpdateIdleMinutes <= 1440, "invalid update idle delay (1-1440 min)")
 	check(s.AutoUpdateForceHours >= 1 && s.AutoUpdateForceHours <= 720, "invalid forced update delay (1-720 h)")
 	check(s.SleepIdleMinutes >= 1 && s.SleepIdleMinutes <= 1440, "invalid sleep delay (1-1440 min)")
+	check(s.ErrorReporting == ErrorReportingHypixel || s.ErrorReporting == ErrorReportingManager || s.ErrorReporting == ErrorReportingOff, "invalid error reporting mode")
+	check(s.SentryForwardDSN == "" || validDSN(s.SentryForwardDSN), "invalid Sentry DSN (https://key@host/project)")
 	check(s.GameLanguage == "en" || s.GameLanguage == "fr", "invalid game language")
 	check(s.GameVersionPin == "" || versionPattern.MatchString(s.GameVersionPin), "invalid game version")
 	return errors.Join(errs...)
+}
+
+func validDSN(raw string) bool {
+	_, err := errorreports.ParseDSN(raw)
+	return err == nil && len(raw) <= 512
 }
 
 // Store persists Settings as JSON.
@@ -136,7 +161,24 @@ func Open(path string) (*Store, error) {
 	if _, err := fsutil.ReadJSON(path, &current); err != nil {
 		return nil, err
 	}
+	if err := migrate(path, &current); err != nil {
+		return nil, err
+	}
 	return &Store{path: path, current: current}, nil
+}
+
+// migrate converts the settings of older versions.
+func migrate(path string, s *Settings) error {
+	var legacy struct {
+		DisableSentry bool `json:"disableSentry"` // before errorReporting
+	}
+	if _, err := fsutil.ReadJSON(path, &legacy); err != nil {
+		return err
+	}
+	if legacy.DisableSentry && s.ErrorReporting == ErrorReportingHypixel {
+		s.ErrorReporting = ErrorReportingOff
+	}
+	return nil
 }
 
 // Get returns a copy of the current settings.

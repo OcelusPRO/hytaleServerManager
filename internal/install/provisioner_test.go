@@ -100,7 +100,7 @@ func TestProvisionerInstallsAndUpdates(t *testing.T) {
 	token := func(context.Context) (string, error) { return "token", nil }
 	p := NewProvisioner(ProvisionerDeps{
 		Java:          NewJavaRuntime(javaDir, tmp, fetch),
-		Game:          NewGameInstall(gameDir, filepath.Join(root, "versions"), tmp, assets, token, fetch),
+		Game:          NewGameInstall(gameDir, tmp, assets, token, fetch),
 		AccountReady:  accountReady.Load,
 		ServerRunning: func() bool { return false },
 		Patchline:     func() string { return "release" },
@@ -139,7 +139,7 @@ func TestProvisionerInstallsAndUpdates(t *testing.T) {
 	}
 }
 
-func TestPinAndRollback(t *testing.T) {
+func TestPinFreezesTheInstalledBuild(t *testing.T) {
 	root := t.TempDir()
 	javaDir, gameDir, tmp := filepath.Join(root, "java"), filepath.Join(root, "game"), filepath.Join(root, "tmp")
 	for _, d := range []string{javaDir, gameDir, tmp} {
@@ -158,7 +158,7 @@ func TestPinAndRollback(t *testing.T) {
 	token := func(context.Context) (string, error) { return "token", nil }
 	p := NewProvisioner(ProvisionerDeps{
 		Java:          NewJavaRuntime(javaDir, tmp, fetch),
-		Game:          NewGameInstall(gameDir, filepath.Join(root, "versions"), tmp, assets, token, fetch),
+		Game:          NewGameInstall(gameDir, tmp, assets, token, fetch),
 		AccountReady:  func() bool { return true },
 		ServerRunning: func() bool { return false },
 		Patchline:     func() string { return "release" },
@@ -170,7 +170,8 @@ func TestPinAndRollback(t *testing.T) {
 	go p.Run(ctx)
 	waitFor(t, "initial install", func() bool { return p.Status().GameVersion == "1.0" })
 
-	// Update to 2.0: 1.0 must be kept for rollback.
+	// Frozen on 1.0: 2.0 is not installed.
+	pin.Store("1.0")
 	assets.mu.Lock()
 	assets.version = "2.0"
 	assets.mu.Unlock()
@@ -179,37 +180,39 @@ func TestPinAndRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-done
-	if st := p.Status(); st.GameVersion != "2.0" || len(st.StoredVersions) != 1 || st.StoredVersions[0] != "1.0" {
-		t.Fatalf("1.0 was not stored: %+v", st)
-	}
-
-	// Roll back to 1.0 and freeze there: no update to 2.0 afterwards.
-	pin.Store("1.0")
-	done = make(chan struct{})
-	if err := p.RequestUpdate(func() { close(done) }); err != nil {
-		t.Fatal(err)
-	}
-	<-done
-	st := p.Status()
-	if st.GameVersion != "1.0" || st.Error != "" || st.UpdateAvailable || st.PinnedVersion != "1.0" {
-		t.Fatalf("rollback failed: %+v", st)
-	}
-	if len(st.StoredVersions) != 1 || st.StoredVersions[0] != "2.0" {
-		t.Fatalf("2.0 should now be stored: %v", st.StoredVersions)
+	if st := p.Status(); st.GameVersion != "1.0" || st.Error != "" || st.UpdateAvailable || st.PinnedVersion != "1.0" {
+		t.Fatalf("the pin was not kept: %+v", st)
 	}
 	if _, pending := p.UpdatePendingSince(); pending {
 		t.Fatal("a frozen game must not report a pending update")
 	}
 
-	// A pin that is neither stored nor the latest cannot be satisfied.
+	// Following the latest again installs 2.0 and deletes 1.0.
+	pin.Store("")
+	done = make(chan struct{})
+	if err := p.RequestUpdate(func() { close(done) }); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if st := p.Status(); st.GameVersion != "2.0" {
+		t.Fatalf("update failed: %+v", st)
+	}
+	entries, _ := os.ReadDir(root)
+	for _, e := range entries {
+		if n := e.Name(); n != "java" && n != "game" && n != "tmp" {
+			t.Errorf("replaced build left behind: %s", n)
+		}
+	}
+
+	// A pin that is neither installed nor the latest cannot be satisfied.
 	pin.Store("0.5")
 	done = make(chan struct{})
 	if err := p.RequestUpdate(func() { close(done) }); err != nil {
 		t.Fatal(err)
 	}
 	<-done
-	if st := p.Status(); st.GameVersion != "1.0" || st.Error == "" {
-		t.Fatalf("unknown pin should fail and keep 1.0: %+v", st)
+	if st := p.Status(); st.GameVersion != "2.0" || st.Error == "" {
+		t.Fatalf("unknown pin should fail and keep 2.0: %+v", st)
 	}
 }
 
@@ -232,7 +235,7 @@ func TestPatchlineChangeInstallsItsBuild(t *testing.T) {
 	token := func(context.Context) (string, error) { return "token", nil }
 	p := NewProvisioner(ProvisionerDeps{
 		Java:          NewJavaRuntime(javaDir, tmp, fetch),
-		Game:          NewGameInstall(gameDir, filepath.Join(root, "versions"), tmp, assets, token, fetch),
+		Game:          NewGameInstall(gameDir, tmp, assets, token, fetch),
 		AccountReady:  func() bool { return true },
 		ServerRunning: func() bool { return false },
 		Patchline:     func() string { return line.Load().(string) },

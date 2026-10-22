@@ -31,6 +31,9 @@ type Config struct {
 	// MetricsStreamPort is the loopback UDP port receiving the optional
 	// metrics plugin stream.
 	MetricsStreamPort int
+	// ErrorReportsPort is the loopback TCP port receiving the error reports
+	// of the game server (Sentry-compatible).
+	ErrorReportsPort int
 }
 
 // Load reads the configuration from the environment, applying defaults.
@@ -62,6 +65,12 @@ func Load() (Config, error) {
 	}
 	if cfg.MetricsStreamPort < 1 || cfg.MetricsStreamPort > 65535 {
 		return Config{}, fmt.Errorf("HSM_METRICS_STREAM_PORT must be a valid port")
+	}
+	if cfg.ErrorReportsPort, err = envInt("HSM_ERROR_REPORTS_PORT", 9878); err != nil {
+		return Config{}, err
+	}
+	if cfg.ErrorReportsPort < 1 || cfg.ErrorReportsPort > 65535 {
+		return Config{}, fmt.Errorf("HSM_ERROR_REPORTS_PORT must be a valid port")
 	}
 	maxUploadMB, err := envInt("HSM_MAX_UPLOAD_MB", 1024)
 	if err != nil {

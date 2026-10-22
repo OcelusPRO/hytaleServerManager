@@ -11,6 +11,7 @@ import (
 // routePlayers registers player management endpoints.
 func (a *api) routePlayers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/players", a.listPlayers)
+	mux.HandleFunc("GET /api/players/known", a.knownPlayers)
 	mux.HandleFunc("GET /api/players/{uuid}", a.getPlayer)
 	mux.HandleFunc("POST /api/players/action", a.playerAction)
 	mux.HandleFunc("POST /api/players/remove", a.playerRemove)
@@ -19,14 +20,18 @@ func (a *api) routePlayers(mux *http.ServeMux) {
 
 type playersResponse struct {
 	// Live is true when the server runs the active save: actions then go
-	// through the console, otherwise only removals are possible.
+	// through the console, otherwise they change the shared lists and the
+	// world receives them at its next boot.
 	Live   bool                   `json:"live"`
 	Online []players.OnlinePlayer `json:"online"`
 	players.Roster
+	// Pending lists the players of the shared lists not applied to the
+	// active world yet.
+	Pending players.Pending `json:"pending"`
 }
 
 func (a *api) listPlayers(w http.ResponseWriter, _ *http.Request) {
-	roster, err := a.deps.PlayerAccess.Roster()
+	roster, pending, err := a.deps.PlayerAccess.Roster()
 	if err != nil && err != players.ErrNoActiveSave {
 		writeError(w, a.log, err)
 		return
@@ -35,9 +40,10 @@ func (a *api) listPlayers(w http.ResponseWriter, _ *http.Request) {
 		roster = players.Roster{Whitelist: players.Whitelist{Players: []players.PlayerRef{}}, Bans: []players.Ban{}, Operators: []players.PlayerRef{}}
 	}
 	writeJSON(w, http.StatusOK, playersResponse{
-		Live:   a.deps.PlayerAccess.Live(),
-		Online: a.deps.Players.Online(),
-		Roster: roster,
+		Live:    a.deps.PlayerAccess.Live(),
+		Online:  a.deps.Players.Online(),
+		Roster:  roster,
+		Pending: pending,
 	})
 }
 
@@ -87,6 +93,16 @@ type playerDetails struct {
 	Online     *players.OnlinePlayer     `json:"online,omitempty"`
 }
 
+// knownPlayers lists every player the manager has seen, connected or not.
+func (a *api) knownPlayers(w http.ResponseWriter, _ *http.Request) {
+	list, err := a.deps.PlayerAccess.Known()
+	if err != nil {
+		writeError(w, a.log, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
 // getPlayer returns everything the manager keeps about one player.
 func (a *api) getPlayer(w http.ResponseWriter, r *http.Request) {
 	uuid := r.PathValue("uuid")
@@ -95,7 +111,12 @@ func (a *api) getPlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := playerDetails{UUID: uuid}
-	if reg, ok := a.deps.PlayerAccess.Registered(uuid); ok {
+	reg, ok, err := a.deps.PlayerAccess.Registered(uuid)
+	if err != nil {
+		writeError(w, a.log, err)
+		return
+	}
+	if ok {
 		out.Registered = &reg
 	}
 	for _, p := range a.deps.Players.Online() {

@@ -31,7 +31,8 @@ type OnlinePlayer struct {
 // teaches the name directory the names it sees.
 type Tracker struct {
 	names    *NameDirectory
-	registry *Registry // optional
+	registry *Registry     // optional
+	save     func() string // save of the running server, for the sessions
 
 	mu     sync.Mutex
 	online map[string]OnlinePlayer // keyed by lower-case uuid
@@ -42,9 +43,10 @@ func NewTracker(names *NameDirectory) *Tracker {
 	return &Tracker{names: names, online: make(map[string]OnlinePlayer)}
 }
 
-// WithRegistry makes the tracker record connections in r.
-func (t *Tracker) WithRegistry(r *Registry) *Tracker {
-	t.registry = r
+// WithRegistry makes the tracker record connections in r, with the save
+// the server runs on given by save.
+func (t *Tracker) WithRegistry(r *Registry, save func() string) *Tracker {
+	t.registry, t.save = r, save
 	return t
 }
 
@@ -74,7 +76,7 @@ func (t *Tracker) Join(uuid, name string) {
 	t.online[key] = OnlinePlayer{UUID: uuid, Name: name, JoinedAt: now}
 	t.mu.Unlock()
 	if t.registry != nil {
-		_ = t.registry.Joined(uuid, name, now) // best effort: presence must not depend on disk
+		_ = t.registry.Joined(uuid, name, t.save(), now) // best effort: presence must not depend on disk
 	}
 }
 

@@ -29,7 +29,7 @@ export function Sidebar({ items, onLogout }: SidebarProps) {
         )}
       </div>
 
-      <nav className="grid grid-cols-5 gap-1 px-2 pb-3 lg:flex lg:flex-1 lg:flex-col lg:px-3 lg:pt-2">
+      <nav className="grid grid-cols-6 gap-1 px-2 pb-3 lg:flex lg:flex-1 lg:flex-col lg:px-3 lg:pt-2">
         {items.map(({ path, label, icon: Icon }) => (
           <NavLink
             key={path}

@@ -2,13 +2,15 @@ import { Eye, Gavel, ListChecks, ShieldCheck, ShieldOff, UserMinus } from "lucid
 import { useState } from "react";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Alert } from "../../components/ui/Alert";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Switch } from "../../components/ui/Field";
 import { useFeedback } from "../../components/ui/feedback";
 import { formatDate } from "../../lib/format";
-import type { BanEntry, OnlinePlayer, PlayerRef } from "../../lib/types";
+import type { BanEntry, KnownPlayer, OnlinePlayer, PlayerRef } from "../../lib/types";
 import { AccessListCard } from "./AccessListCard";
 import { BanDetailsDialog } from "./BanDetailsDialog";
+import { KnownPlayersCard } from "./KnownPlayersCard";
 import { useStreamOverview } from "../../components/metrics/LiveMetrics";
 import { OnlinePlayersCard } from "./OnlinePlayersCard";
 import { PlayerDetailsDialog } from "./PlayerDetailsDialog";
@@ -20,7 +22,7 @@ import { translate as t } from "../../lib/i18n";
 const target = (p: PlayerRef) => p.name || p.uuid;
 
 export function PlayersPage() {
-  const { data, act, remove, setWhitelist } = usePlayers();
+  const { data, known, act, remove, setWhitelist } = usePlayers();
   const { confirm, prompt } = useFeedback();
   const [banShown, setBanShown] = useState<BanEntry | null>(null);
   const stream = useStreamOverview();
@@ -28,8 +30,12 @@ export function PlayersPage() {
   if (!data) return null;
 
   const live = data.live;
-  // Followed by id: the dialog closes by itself when the player leaves.
-  const selectedPlayer = data.online.find((p) => p.uuid === selected);
+  const waiting = new Set([...(data.pending?.bans ?? []), ...(data.pending?.operators ?? []), ...(data.pending?.whitelist ?? [])].map((u) => u.toLowerCase()));
+  // A shared entry the active world receives at its next boot.
+  const pendingBadge = (uuid: string) => waiting.has(uuid.toLowerCase()) && <Badge tone="warning">{t("players.pending")}</Badge>;
+  // Followed by id: a player who leaves stays shown, as a known player.
+  const same = (uuid: string) => uuid.toLowerCase() === selected?.toLowerCase();
+  const selectedPlayer: PlayerRef | undefined = data.online.find((p) => same(p.uuid)) ?? known?.find((p) => same(p.uuid));
 
   const ban = async (player: OnlinePlayer | PlayerRef | string) => {
     const name = typeof player === "string" ? player : target(player);
@@ -45,7 +51,7 @@ export function PlayersPage() {
     return act("ban", name, t("players.ban.done", { name }), reason);
   };
 
-  const kick = async (p: OnlinePlayer) => {
+  const kick = async (p: OnlinePlayer | KnownPlayer) => {
     if (await confirm({ title: t("players.kick.title", { name: p.name }), confirmLabel: t("players.kick.confirm") })) await act("kick", p.name, t("players.kick.done", { name: p.name }));
   };
 
@@ -74,6 +80,19 @@ export function PlayersPage() {
         onSelect={(p) => setSelected(p.uuid)}
       />
 
+      <KnownPlayersCard
+        players={known ?? []}
+        roster={data}
+        onSelect={(p) => setSelected(p.uuid)}
+        onKick={(p) => void kick(p)}
+        onBan={(p) => void ban(p)}
+        onUnban={(p) => void remove("bans", p.uuid, t("players.ban.unbanned", { name: displayName(p) }))}
+        onOp={(p) => void act("op", target(p), t("players.op.done", { name: displayName(p) }))}
+        onDeop={(p) => void deop(p)}
+        onWhitelistAdd={(p) => void act("whitelist-add", target(p), t("players.whitelist.added", { name: displayName(p) }))}
+        onWhitelistRemove={(p) => void remove("whitelist", p.uuid, t("players.whitelist.removed", { name: displayName(p) }))}
+      />
+
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
         <AccessListCard
           title={t("players.whitelist.title")}
@@ -90,11 +109,14 @@ export function PlayersPage() {
           itemKey={(p) => p.uuid}
           emptyText={t("players.whitelist.empty")}
           addLabel={t("players.whitelist.add")}
-          canAdd={live}
+          canAdd
           onAdd={(name) => act("whitelist-add", name, t("players.whitelist.added", { name }))}
           renderItem={(p) => (
             <>
-              <PlayerIdentity player={p} />
+              <div className="flex min-w-0 items-center gap-2">
+                <PlayerIdentity player={p} />
+                {pendingBadge(p.uuid)}
+              </div>
               <Button
                 size="sm"
                 variant="ghost"
@@ -115,11 +137,14 @@ export function PlayersPage() {
           itemKey={(b) => b.player.uuid}
           emptyText={t("players.bans.empty")}
           addLabel={t("players.bans.add")}
-          canAdd={live}
+          canAdd
           onAdd={(name) => ban(name)}
           renderItem={(b) => (
             <>
-              <PlayerIdentity player={b.player} detail={b.reason || (b.timestamp ? t("players.bans.bannedOn", { date: formatDate(b.timestamp) }) : t("players.bans.noReason"))} />
+              <div className="flex min-w-0 items-center gap-2">
+                <PlayerIdentity player={b.player} detail={b.reason || (b.timestamp ? t("players.bans.bannedOn", { date: formatDate(b.timestamp) }) : t("players.bans.noReason"))} />
+                {pendingBadge(b.player.uuid)}
+              </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button size="sm" variant="ghost" icon={Eye} onClick={() => setBanShown(b)}>
                   {t("players.bans.view")}
@@ -138,11 +163,14 @@ export function PlayersPage() {
           itemKey={(p) => p.uuid}
           emptyText={t("players.operators.empty")}
           addLabel={t("players.operators.add")}
-          canAdd={live}
+          canAdd
           onAdd={(name) => act("op", name, t("players.op.done", { name }))}
           renderItem={(p) => (
             <>
-              <PlayerIdentity player={p} />
+              <div className="flex min-w-0 items-center gap-2">
+                <PlayerIdentity player={p} />
+                {pendingBadge(p.uuid)}
+              </div>
               <Button size="sm" variant="ghost" icon={UserMinus} onClick={() => deop(p)}>
                 {t("players.operators.remove")}
               </Button>

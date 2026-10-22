@@ -69,7 +69,7 @@ func BuildLaunchSpec(in LaunchInputs) LaunchSpec {
 		"--bind", "0.0.0.0:"+strconv.Itoa(s.Port),
 		"--auth-mode", s.AuthMode,
 	)
-	if s.DisableSentry {
+	if s.ErrorReporting == settings.ErrorReportingOff {
 		args = append(args, "--disable-sentry")
 	}
 	if s.AcceptEarlyPlugins {

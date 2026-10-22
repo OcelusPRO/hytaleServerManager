@@ -16,7 +16,7 @@ interface AccessListCardProps<T> {
   /** Element shown at the right of the title (e.g. a switch). */
   headerAction?: ReactNode;
   addLabel: string;
-  /** Adds a player by name; additions need the server to be running. */
+  /** Adds a player by name (one the manager knows while the server is stopped). */
   onAdd: (name: string) => Promise<boolean>;
   canAdd: boolean;
 }

@@ -72,6 +72,18 @@ func (m *SessionManager) Validate(token string) bool {
 	return true
 }
 
+// Active reports whether token still belongs to a live session, without
+// refreshing it (a long-lived stream must not keep a session alive).
+func (m *SessionManager) Active(token string) bool {
+	if token == "" {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[sha256.Sum256([]byte(token))]
+	return ok && !m.expired(s, m.now())
+}
+
 // Revoke ends the session identified by token.
 func (m *SessionManager) Revoke(token string) {
 	m.mu.Lock()

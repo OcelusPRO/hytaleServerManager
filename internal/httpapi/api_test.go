@@ -67,7 +67,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	api := hytaleapi.NewClient(http.DefaultClient, hytaleapi.DefaultEndpoints())
 	provisioner := install.NewProvisioner(install.ProvisionerDeps{
 		Java:          install.NewJavaRuntime(dir("java"), tmp, fetcher),
-		Game:          install.NewGameInstall(dir("game"), dir("game-versions"), tmp, api, hytale.AccessToken, fetcher),
+		Game:          install.NewGameInstall(dir("game"), tmp, api, hytale.AccessToken, fetcher),
 		AccountReady:  hytale.Ready,
 		ServerRunning: process.Active,
 		Patchline:     func() string { return "release" },
